@@ -180,7 +180,7 @@ if ( urlParamsBase.has("zip") ) {
                        path_img_array =  path_img_orig.split('?') // split route path from query strings
                        var urlParamsImg = new URLSearchParams( path_img_array[1] );
                        
-                       urlParamsImg.set( "pcmd", hideThunder( urlParamsImg.get( "pcmd" ) ) );
+//                       urlParamsImg.set( "pcmd", hideThunder( urlParamsImg.get( "pcmd" ) ) );
 //                       urlParamsImg.set( "pcmd", showSnow( urlParamsImg.get( "pcmd" ) ) );
                        
                        $("#img1").attr( "src", URL_BASE + path_img_array[0] + "?" + urlParamsImg.toString() );
