@@ -10,7 +10,7 @@
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCILANmgIcwkai7OlOpUj03Jhp5yRXV48A&libraries=geocoding,places&callback=initAutocomplete" async defer></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCILANmgIcwkai7OlOpUj03Jhp5yRXV48A&libraries=geocoding,places&loading=async&callback=initAutocomplete" async defer></script>
 
 <script type="text/javascript">
 
@@ -143,64 +143,64 @@ const urlParamsBase = new URLSearchParams( window.location.search );
 
 var autocomplete; // global
 
-// detect carriage return in input field.. -> redirect to "?zip=$zip" ..
-window.onload = function () {
+window.onload = function () { // wait for Google Maps libraries to become available before using them
+  
+  // detect carriage return in input field.. -> redirect to "?zip=$zip" ..
   document.getElementById("autocomplete").onkeydown = function (e) {
     if ( e.keyCode === 13 ) {
       redirect_to_zip_using_address( document.getElementById("autocomplete").value );
       return false;
     }
   }
-}
   
-// process zip query arg ..
-if ( urlParamsBase.has("zip") ) {
-  
-  var xhr = new XMLHttpRequest(); // for obtaining responseURL in jQuery success()
-  
-  $.ajax( { url: URL_BASE + "zipcity.php",
-            type: "POST",
-            data: { inputstring: urlParamsBase.get("zip") },
-            xhr: function() {
-              return xhr;
-            },
-            success: function( dataCity ) {
-              pathForecast = $( dataCity ).find( "img[src='newimages/medium/hourlyweather.png']" ).closest("a").attr("href");
-//              console.log( "pathForecast: " + pathForecast );
-//              console.log( "responseURL: " + xhr.responseURL );
-              var urlParamsRedirected = new URLSearchParams( xhr.responseURL.split("?")[1] );
-//              console.log( "CityName: " + urlParamsRedirected.get( "CityName" ) );
-//              console.log( "state: " + urlParamsRedirected.get( "state" ) );
-//              console.log( "lat: " + urlParamsRedirected.get( "lat" ) );
-//              console.log( "lon: " + urlParamsRedirected.get( "lon" ) );
-              $("#radar").html( "<a href='https://www.weatherbug.com/maps/?layerId=Radar.Global&center=" + urlParamsRedirected.get( "lat" ) + "," + urlParamsRedirected.get( "lon" ) + "'>Live Radar</a>" );
-              $("#citystatezip").html( urlParamsRedirected.get( "CityName" ) + ", " + urlParamsRedirected.get( "state" ) + " (" + urlParamsBase.get("zip") + ") : " );
-              $.get( URL_BASE + pathForecast,
-                     function( dataForecast ) {
-                       path_img_orig = $( dataForecast ).find( "img[src*='meteograms/Plotter.php']" ).attr("src");
-//                       console.log( "path_img_orig: " + path_img_orig );
-                       path_img_array =  path_img_orig.split('?') // split route path from query strings
-                       var urlParamsImg = new URLSearchParams( path_img_array[1] );
-                       
-//                       urlParamsImg.set( "pcmd", hideThunder( urlParamsImg.get( "pcmd" ) ) );
-//                       urlParamsImg.set( "pcmd", showSnow( urlParamsImg.get( "pcmd" ) ) );
-                       
-                       $("#img1").attr( "src", URL_BASE + path_img_array[0] + "?" + urlParamsImg.toString() );
-                       urlParamsImg.set( "ahour", "48" );
-                       $("#img2").attr( "src", URL_BASE + path_img_array[0] + "?" + urlParamsImg.toString() );
-                       urlParamsImg.set( "ahour", "96" );
-                       $("#img3").attr( "src", URL_BASE + path_img_array[0] + "?" + urlParamsImg.toString() );
-                   });
-              }
-          });
+  // process zip query arg ..
+  if ( urlParamsBase.has("zip") ) {
+    
+    var xhr = new XMLHttpRequest(); // for obtaining responseURL in jQuery success()
+    
+    $.ajax( { url: URL_BASE + "zipcity.php",
+              type: "POST",
+              data: { inputstring: urlParamsBase.get("zip") },
+              xhr: function() {
+                return xhr;
+              },
+              success: function( dataCity ) {
+                pathForecast = $( dataCity ).find( "img[src='newimages/medium/hourlyweather.png']" ).closest("a").attr("href");
+//                console.log( "pathForecast: " + pathForecast );
+//                console.log( "responseURL: " + xhr.responseURL );
+                var urlParamsRedirected = new URLSearchParams( xhr.responseURL.split("?")[1] );
+//                console.log( "CityName: " + urlParamsRedirected.get( "CityName" ) );
+//                console.log( "state: " + urlParamsRedirected.get( "state" ) );
+//                console.log( "lat: " + urlParamsRedirected.get( "lat" ) );
+//                console.log( "lon: " + urlParamsRedirected.get( "lon" ) );
+                $("#radar").html( "<a href='https://www.weatherbug.com/maps/?layerId=Radar.Global&center=" + urlParamsRedirected.get( "lat" ) + "," + urlParamsRedirected.get( "lon" ) + "'>Live Radar</a>" );
+                $("#citystatezip").html( urlParamsRedirected.get( "CityName" ) + ", " + urlParamsRedirected.get( "state" ) + " (" + urlParamsBase.get("zip") + ") : " );
+                $.get( URL_BASE + pathForecast,
+                       function( dataForecast ) {
+                         path_img_orig = $( dataForecast ).find( "img[src*='meteograms/Plotter.php']" ).attr("src");
+//                         console.log( "path_img_orig: " + path_img_orig );
+                         path_img_array =  path_img_orig.split('?') // split route path from query strings
+                         var urlParamsImg = new URLSearchParams( path_img_array[1] );
+//                         urlParamsImg.set( "pcmd", hideThunder( urlParamsImg.get( "pcmd" ) ) );
+//                         urlParamsImg.set( "pcmd", showSnow( urlParamsImg.get( "pcmd" ) ) );
+                         $("#img1").attr( "src", URL_BASE + path_img_array[0] + "?" + urlParamsImg.toString() );
+                         urlParamsImg.set( "ahour", "48" );
+                         $("#img2").attr( "src", URL_BASE + path_img_array[0] + "?" + urlParamsImg.toString() );
+                         urlParamsImg.set( "ahour", "96" );
+                         $("#img3").attr( "src", URL_BASE + path_img_array[0] + "?" + urlParamsImg.toString() );
+                     });
+                }
+            });
 
-} else {
+  } else {
     // attempt to get lat+lon from browser geolocation, fetch likely zip, and attempt to redir to ?zip=* from homepage (presume most visitors want to know about local weather) ..
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(function(position) {
             redirect_to_zip_using_latlng( position.coords.latitude, position.coords.longitude );
         });
     }
+  }
+
 }
 </script>
 
