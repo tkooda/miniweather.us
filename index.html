@@ -10,130 +10,11 @@
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
 
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCILANmgIcwkai7OlOpUj03Jhp5yRXV48A&libraries=places&loading=async&callback=initAutocomplete" async defer></script>
+
 <script type="text/javascript">
 
-var key = 'AIzaSyCILANmgIcwkai7OlOpUj03Jhp5yRXV48A';
-
-// detect carriage return in input field.. -> redirect to /zip/$zip ..
-window.onload = function () {
-  document.getElementById("autocomplete").onkeydown = function (e) {
-    if ( e.keyCode === 13 ) {
-      redirect_to_zip_using_address( document.getElementById("autocomplete").value );
-      return false;
-    }
-  }
-}
-
-
-// redirect to /zip/$zip using latitude + longitude ..
-function redirect_to_zip_using_latlng( lat, lng ) {
-  var url = 'https://maps.googleapis.com/maps/api/geocode/json?key=' + key + '&latlng=' + lat + ',' + lng;
-//console.log( "url latlng: " + url );
-  $.getJSON( url, function( data ) {
-//console.log( "status: " + data['status'] );
-    var zip = 0;
-    $.each( data[ 'results' ][ 0 ][ 'address_components' ] , function( key, val ) {
-      if ( val[ 'types' ] == 'postal_code' ) {
-        zip = val[ 'short_name' ];
-        return false; // break
-      }
-    });
-    if (zip != 0) {
-      window.location.href = window.location.pathname + "?zip=" + zip.toString();
-      return false;
-    }
-// else console.log( "ERROR: zip is zero: " + lat + ", " + lng );
-  });
-}
-
-
-// redirect to /zip/$zip using (e.g.) "city, state, country" ..
-function redirect_to_zip_using_address( address ) {
-  var url = 'https://maps.googleapis.com/maps/api/geocode/json?key=' + key + '&address=' + encodeURIComponent( address );
-  $.getJSON( url, function( data ) {
-    var lat = data[ 'results' ][ 0 ][ 'geometry' ][ 'location' ][ 'lat' ]; // just guess first response is good?
-    var lng = data[ 'results' ][ 0 ][ 'geometry' ][ 'location' ][ 'lng' ];
-    redirect_to_zip_using_latlng( lat, lng );
-  });
-}
-
-
-// use Google Places API to provide autocomplete..
-
-var placeSearch, autocomplete;
-var componentForm = {
-  street_number: 'short_name',
-  route: 'long_name',
-  locality: 'long_name',
-  administrative_area_level_1: 'short_name',
-  country: 'long_name',
-  postal_code: 'short_name'
-};
-
-
-function initAutocomplete() {
-  // Create the autocomplete object, restricting the search to geographical
-  // location types.
-  autocomplete = new google.maps.places.Autocomplete(
-/** @type {!HTMLInputElement} */(document.getElementById('autocomplete')),
-      {types: ['geocode']});
-//      {types: ['(cities)']});
-
-  // When the user selects an address from the dropdown, populate the address
-  // fields in the form.
-  autocomplete.addListener('place_changed', processAddress);
-}
-
-
-function processAddress() {
-  // Get the place details from the autocomplete object.
-  var place = autocomplete.getPlace();
-//console.log( "place.address_components: " + place.address_components );
-  if ( ! place.address_components ) return;
-  
-  var city = "";
-  var state = "";
-  var country = "";
-  for (var i = 0; i < place.address_components.length; i++) {
-    var addressType = place.address_components[i].types[0];
-    if (componentForm[addressType]) {
-      var val = place.address_components[i][componentForm[addressType]];
-//console.log( addressType + " : " + val );
-      if ( addressType == 'locality' ) {
-        city = val;
-      } else if ( addressType == 'administrative_area_level_1' ) {
-        state = val
-      } else if ( addressType == 'country' ) {
-        country = val
-      }
-    }
-  }
-
-//console.log( "citystatecountry:" + city + ", " + state + ", " + country );
-  redirect_to_zip_using_address( city + ", " + state + ", " + country )
-}
-
-
-// Bias the autocomplete object to the user's geographical location,
-// as supplied by the browser's 'navigator.geolocation' object.
-function geolocate() {
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(function(position) {
-      var geolocation = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude
-      };
-      var circle = new google.maps.Circle({
-        center: geolocation,
-        radius: position.coords.accuracy
-      });
-      autocomplete.setBounds(circle.getBounds());
-    });
-  }
-}
-
-
-// remove thunder from images..
+// utility functions to remove thunder / show snow on images..
 String.prototype.replaceAt = function(index, replacement) {
     return this.substr(0, index) + replacement+ this.substr(index + replacement.length);
 }
@@ -145,14 +26,135 @@ function showSnow( s ) {
 }
 
 
+// redirect to "?zip=$zip" using latitude + longitude ..
+function redirect_to_zip_using_latlng( lat, lng ) {
+  const geocoder = new google.maps.Geocoder();
+  const latlng = new google.maps.LatLng( lat, lng );
+  
+  geocoder.geocode( { 'location': latlng }, function(results, status) {
+    if ( status == "OK" ) {
+      if ( results[ 0 ] ) {
+        // search results for zip code..
+        for (var i = 0; i < results[0].address_components.length; i++) {
+          for (var j = 0; j < results[0].address_components[i].types.length; j++) {
+            if (results[0].address_components[i].types[j] === 'postal_code') {
+              var zipCode = results[0].address_components[i].long_name;
+              window.location.href = window.location.pathname + "?zip=" + zipCode.toString();
+              return false; // indicate handled
+            }
+          }
+        }
+      }
+    } else {
+      console.error('Geocode was not successful for the following reason: ' + status);
+    }
+  });
+}
+
+
+// redirect to /zip/$zip using (e.g.) "city, state, country" ..
+function redirect_to_zip_using_address( address ) {
+  const geocoder = new google.maps.Geocoder();
+  const request = {
+    address: address,
+    region: 'us'
+  };
+  
+  geocoder.geocode( request, ( results, status ) => {
+    if ( status === 'OK' ) {
+      redirect_to_zip_using_latlng( results[ 0 ].geometry.location.lat(), results[ 0 ].geometry.location.lng() );
+    } else {
+      console.error('Geocode was not successful for the following reason: ' + status);
+    }
+  });
+
+}
+
+
+function initAutocomplete() {
+  // use Google Places API to provide autocomplete..  (using old "google.maps.places.Autocomplete" method (vs new "google.maps.places.PlaceAutocompleteElement" method that looks weird)
+  autocomplete = new google.maps.places.Autocomplete(
+ /** @type {!HTMLInputElement} */(document.getElementById('autocomplete')),
+      {types: ['geocode']
+  });
+  
+  // When the user selects an address from the dropdown, populate the address fields in the form.
+  autocomplete.addListener('place_changed', processAddress);
+}
+
+
+function processAddress() {
+  const componentForm = {
+    street_number: 'short_name',
+    route: 'long_name',
+    locality: 'long_name',
+    administrative_area_level_1: 'short_name',
+    country: 'long_name',
+    postal_code: 'short_name'
+  };
+  
+  // Get the place details from the autocomplete object.
+  var place = autocomplete.getPlace();
+  if ( ! place.address_components ) return;
+  
+  var city = "";
+  var state = "";
+  var country = "";
+  for (var i = 0; i < place.address_components.length; i++) {
+    var addressType = place.address_components[i].types[0];
+    if (componentForm[addressType]) {
+      var val = place.address_components[i][componentForm[addressType]];
+//      console.log( addressType + " : " + val );
+      if ( addressType == 'locality' ) {
+        city = val;
+      } else if ( addressType == 'administrative_area_level_1' ) {
+        state = val
+      } else if ( addressType == 'country' ) {
+        country = val
+      }
+    }
+  }
+  
+  redirect_to_zip_using_address( city + ", " + state + ", " + country );
+}
+
+
+function biasGeolocate() {
+  // attempt to bias the autocomplete object to the user's geographical location, as supplied by the browser's 'navigator.geolocation' object.
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(position) {
+      const geolocation = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      };
+      const circle = new google.maps.Circle({
+        center: geolocation,
+        radius: position.coords.accuracy
+      });
+      autocomplete.setBounds(circle.getBounds());
+    });
+  }
+}
+
+
 // main()..
+const URL_BASE = "https://forecast.weather.gov/";
+const urlParamsBase = new URLSearchParams( window.location.search );
 
-var URL_BASE = "https://forecast.weather.gov/";
-var urlParamsBase = new URLSearchParams( window.location.search );
+var autocomplete; // global
 
-// process zip ..
+// detect carriage return in input field.. -> redirect to "?zip=$zip" ..
+window.onload = function () {
+  document.getElementById("autocomplete").onkeydown = function (e) {
+    if ( e.keyCode === 13 ) {
+      redirect_to_zip_using_address( document.getElementById("autocomplete").value );
+      return false;
+    }
+  }
+}
+  
+// process zip query arg ..
 if ( urlParamsBase.has("zip") ) {
-//  console.log("zip: " + urlParamsBase.get("zip") )
   
   var xhr = new XMLHttpRequest(); // for obtaining responseURL in jQuery success()
   
@@ -193,7 +195,7 @@ if ( urlParamsBase.has("zip") ) {
           });
 
 } else {
-    // attempt to get lat/lon from browser geocode, fetch likely zip, and attempt to redir to ?zip=* from homepage (presume most visitors want to know about local weather) ..
+    // attempt to get lat+lon from browser geolocation, fetch likely zip, and attempt to redir to ?zip=* from homepage (presume most visitors want to know about local weather) ..
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(function(position) {
             redirect_to_zip_using_latlng( position.coords.latitude, position.coords.longitude );
@@ -206,7 +208,7 @@ if ( urlParamsBase.has("zip") ) {
 <tr>
 <td><a href="/">MiniWeather.US</a> :
 <span id="citystatezip"></span>
-<input id="autocomplete" placeholder="Enter a city or zipcode" onFocus="geolocate()" type="text"></input></td>
+<input id="autocomplete" placeholder="Enter a city or zipcode" onclick="biasGeolocate()" type="text"></input></td>
 <td align="right" id="radar"></td>
 </tr>
 </table>
@@ -214,8 +216,6 @@ if ( urlParamsBase.has("zip") ) {
 <img id="img1" src="" width="100%"><br/><br/><br/><br/>
 <img id="img2" src="" width="100%"><br/><br/><br/><br/>
 <img id="img3" src="" width="100%"><br/><br/><br/><br/>
-
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCILANmgIcwkai7OlOpUj03Jhp5yRXV48A&libraries=places&callback=initAutocomplete" async defer></script>
 
 </body>
 
