@@ -36,6 +36,7 @@
 
 <script type="text/javascript">
 
+// utility functions
 String.prototype.replaceAt = function(index, replacement) {
     return this.substr(0, index) + replacement + this.substr(index + replacement.length);
 }
@@ -44,6 +45,7 @@ function showThunder(s) { return s.replaceAt(9, "1"); }
 function hideSnow(s)    { return s.replaceAt(10, "0000"); }
 function showSnow(s)    { return s.replaceAt(10, "1111"); }
 
+// IP Location Fallback
 function fallbackToIPLocation() {
     fetch('https://ipapi.co/json/')
         .then(response => response.json())
@@ -198,14 +200,16 @@ window.onload = function () {
   }
   
   if ( urlParams.has("zip") ) {
+    var xhr = new XMLHttpRequest(); 
     $.ajax( { url: URL_BASE + "zipcity.php", type: "POST", data: { inputstring: urlParams.get("zip") }, success: function( dataCity ) {
         var pathForecast = $( dataCity ).find( "img[src='newimages/medium/hourlyweather.png']" ).closest("a").attr("href");
         
-        // --- FIXED CITY/STATE EXTRACTION ---
-        // Try getting name/state from redirect URL, fallback to "Zip [Value]"
-        var cityName = $(dataCity).find("title").text().split(" - ")[0] || "Location";
-        var state = ""; // Difficult to extract from generic NWS pages without parsing specific tags
-        $("#citystatezip").html(cityName + " (" + urlParams.get("zip") + ") : ");
+        // --- RESTORED ROBUST CITY/STATE EXTRACTION ---
+        // Get the redirect URL of the actual forecast page request
+        var urlParamsRedirected = new URLSearchParams( xhr.responseURL.split("?")[1] );
+        var cityName = urlParamsRedirected.get("CityName") || "Location";
+        var state = urlParamsRedirected.get("state") || "";
+        $("#citystatezip").html(cityName + ", " + state + " (" + urlParams.get("zip") + ") : ");
         // ------------------------------------
 
         $.get( URL_BASE + pathForecast, function( dataForecast ) {
