@@ -9,20 +9,23 @@
   .gps-btn { background: none; border: none; cursor: pointer; padding: 2px 4px; display: flex; align-items: center; }
   .checkbox-label { font-family: sans-serif; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
   
-  /* Mobile: Horizontal, full-height images, no snapping */
-  .weather-images {
-    display: flex;
-    overflow-x: auto;
-    width: 100%;
-    height: 100vh;
-    -webkit-overflow-scrolling: touch;
-  }
-  .weather-images img {
-    flex: 0 0 auto;
-    height: 100%;
-    width: auto;
-    object-fit: contain;
-    display: block;
+  /* Mobile: Flexbox keeps header and images visible */
+  @media (max-width: 767px) {
+    body { display: flex; flex-direction: column; height: 100vh; margin: 0; }
+    .weather-images {
+      display: flex;
+      flex: 1;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      min-height: 0; /* Important for flex child */
+    }
+    .weather-images img {
+      flex: 0 0 auto;
+      height: 100%;
+      width: auto;
+      object-fit: contain;
+      display: block;
+    }
   }
 
   /* Desktop: Vertical stack */
@@ -30,7 +33,6 @@
     .weather-images {
       display: block;
       overflow-x: visible;
-      height: auto;
     }
     .weather-images img {
       width: 100%;
