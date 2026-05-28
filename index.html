@@ -175,6 +175,25 @@ const urlParamsBase = new URLSearchParams( window.location.search );
 var autocomplete; // global
 
 window.onload = function () {
+
+  // Dynamically hide/show the GPS button based on permission state
+  if (navigator.geolocation && navigator.permissions) {
+    navigator.permissions.query({name: 'geolocation'}).then(function(result) {
+      const gpsBtn = document.getElementById("gpsBtn");
+      
+      if (result.state === 'granted') {
+        gpsBtn.style.display = 'none';
+      }
+
+      result.onchange = function() {
+        if (this.state === 'granted') {
+          gpsBtn.style.display = 'none';
+        } else {
+          gpsBtn.style.display = 'flex';
+        }
+      };
+    });
+  }
   
   // 1. Read URL overrides (returns null if user hasn't explicitly interacted yet)
   const userThunder = urlParamsBase.get("thunder");
@@ -265,7 +284,7 @@ window.onload = function () {
   <input id="autocomplete" placeholder="Enter a city or zipcode" type="text" style="width:160px;" onfocus="safeBiasGeolocate()"></input>
   
   <div class="controls-container">
-    <button type="button" class="gps-btn" onclick="manualGeolocate()" title="Use Current Location">
+    <button type="button" class="gps-btn" id="gpsBtn" onclick="manualGeolocate()" title="Use Current Location">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="#444">
         <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
       </svg>
