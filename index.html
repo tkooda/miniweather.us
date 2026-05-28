@@ -91,6 +91,7 @@ const URL_BASE = "https://forecast.weather.gov/";
 window.onload = function () {
   const urlParams = new URLSearchParams(window.location.search);
   
+  // 1. Initial UI Setup
   if (urlParams.get("thunder") !== null) document.getElementById("chkThunder").checked = (urlParams.get("thunder") === "1");
   if (urlParams.get("snow") !== null) document.getElementById("chkSnow").checked = (urlParams.get("snow") === "1");
 
@@ -138,19 +139,23 @@ window.onload = function () {
         const img = doc.querySelector("img[src*='meteograms/Plotter.php']");
         if (!img) return;
         
-        // --- FIXED: FORCING ABSOLUTE URL ---
-        let rawSrc = img.getAttribute('src');
-        let fullImgUrl = rawSrc.startsWith('http') ? rawSrc : URL_BASE + rawSrc.replace(/^\//, '');
+        let imgSrc = img.getAttribute('src');
+        let fullImgUrl = imgSrc.startsWith('http') ? imgSrc : URL_BASE + imgSrc.replace(/^\//, '');
         
         const [base, query] = fullImgUrl.split('?');
         const params = new URLSearchParams(query);
         const pcmd = params.get("pcmd");
         
+        // 2. Logic to apply state and SYNC UI
         const finalThunder = urlParams.get("thunder") !== null ? (urlParams.get("thunder") === "1") : (pcmd.charAt(9) === '1');
         const finalSnow = urlParams.get("snow") !== null ? (urlParams.get("snow") === "1") : (pcmd.substring(10, 14) !== '0000');
         
+        // Sync Checkboxes
+        document.getElementById("chkThunder").checked = finalThunder;
+        document.getElementById("chkSnow").checked = finalSnow;
+        
         let newPcmd = finalThunder ? showThunder(pcmd) : hideThunder(pcmd);
-        newPcmd = finalSnow ? showSnow(newPcmd) : hideSnow(pcmd);
+        newPcmd = finalSnow ? showSnow(newPcmd) : hideSnow(newPcmd);
         params.set("pcmd", newPcmd);
 
         document.getElementById("img1").src = base + "?" + params.toString();
