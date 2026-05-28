@@ -3,7 +3,9 @@
 <head>
 <title>MiniWeather.US</title>
 <link rel="icon" href="data:;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAD////////////////////////////+/v///v3///79///+/f///v3///79/////v////////////////////////////////////////79///////z1LD/8tOt//LPpv/z0qz/89Sw//DImf/+/Pn///////////////////////////////////////7+/f//////+erY/+uuav/uuoH/7ruD/+23e//stHb/89Co///////9/Pv///////////////////////////////////7+///////43b7/+eTL//ngxf/54MT/+eTL//jdv/////////79//////////////////7+////////+vr5/8TCwv+5tbT/vL3B/7u8v/+7vMD/u7zA/7u8v/+8vcH/uLW0/9bV1f/////////////////+/v7//////8XFxf+9u7v/4uDe/93Z1//d2tj/3drY/93a2P/d2tj/3drY/9/c2/+vq6r/3dzc////////////7/n8//L////GvLj/3dbT//Dw8P/r6Of/7Orp/+zq6f/s6un/7Orp/+rp6P/z8vH/2NTT/8G/vv///////////9Hw/P9z1v7/vdzp/4eZo//j3dr/6uzr/+fl5P/p5uX/6efm/+jm5f/o5uX/6efm/7Swr//a2Nj////////////m+P7/7vf8/0LR//8SyN7/v62o//Hk4//s6en/6Ofm/+jm5f/n5eT/7+3s/8K/vv/Avr3///////7+/v////7/gNj7/7fl/P80yPv/APj//zvO0/+Orqz/r7Gu/+3q6f/s6+r/6ujn//Px8P+zsK//5+fn///////+/v7///////j9/v/S8fz/Z8/7/wDR/f8F9v7/AN3//1anxv/Cs67/3d3d/+Th4P+9ubj/vbu6///////+/v7////////////K7vz/e9b7/+35/P9q0Pv/Psr7/1nM/P/V9P//3dfV/7Wzs/+2s7P/y8nJ//z8/P///////////////////////f7///////9u0vr/1fL8/7Hl/P/j9v3/adD6//X8/////////v/////////+/v7////////////////////////////8/v//0/H9//3+//931fv/6vn+/9r0/f/0+/3///////7////+/f3////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////9/v////////7//////////f7/////////////////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==">
+
 <script src="https://rainviewer.com/integration/map.js" async></script>
+
 <style>
   .controls-container { display: inline-flex; align-items: center; gap: 8px; margin-left: 5px; }
   .gps-btn { background: none; border: none; cursor: pointer; padding: 2px 4px; display: flex; align-items: center; }
@@ -19,32 +21,33 @@
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCILANmgIcwkai7OlOpUj03Jhp5yRXV48A&libraries=geocoding,places&loading=async&callback=initAutocomplete" async defer></script>
 
 <script type="text/javascript">
+// Utility Functions
 String.prototype.replaceAt = function(index, replacement) {
     return this.substr(0, index) + replacement + this.substr(index + replacement.length);
 }
+function hideThunder(s) { return s.replaceAt(9, "0"); }
+function showThunder(s) { return s.replaceAt(9, "1"); }
+function hideSnow(s)    { return s.replaceAt(10, "0000"); }
+function showSnow(s)    { return s.replaceAt(10, "1111"); }
 
 let mapInstance = null;
 let currentLat = null, currentLon = null;
 
-// Modal Functions
+// Modal Logic
 function openRadarModal() {
     document.getElementById("radarModal").style.display = "block";
     initRainViewerDelayed();
 }
+function closeRadarModal() { document.getElementById("radarModal").style.display = "none"; }
 
-function closeRadarModal() { 
-    document.getElementById("radarModal").style.display = "none"; 
-}
-
-// Non-blocking initialization loop
+// This function checks repeatedly until the async script finishes loading
 function initRainViewerDelayed() {
-    // If library not ready, wait and try again
     if (typeof RainViewerMap === 'undefined') {
-        setTimeout(initRainViewerDelayed, 300);
+        setTimeout(initRainViewerDelayed, 500); // Poll every 500ms
         return;
     }
     
-    // Once ready, show map (if not already showing)
+    // Once loaded, show the map if lat/lon are ready
     if (!mapInstance && currentLat && currentLon) {
         document.getElementById("loadingMsg").style.display = "none";
         mapInstance = new RainViewerMap({
@@ -57,6 +60,7 @@ function initRainViewerDelayed() {
     }
 }
 
+// ... Rest of your Geolocation / Initialization logic remains unchanged ...
 function fallbackToIPLocation() {
     fetch('https://ipapi.co/json/').then(r => r.json()).then(data => {
         if (data?.postal) {
@@ -124,7 +128,7 @@ const URL_BASE = "https://forecast.weather.gov/";
 window.onload = function () {
   const urlParams = new URLSearchParams(window.location.search);
   
-  // UI Setup
+  // UI setup
   if (urlParams.get("thunder") !== null) document.getElementById("chkThunder").checked = (urlParams.get("thunder") === "1");
   if (urlParams.get("snow") !== null) document.getElementById("chkSnow").checked = (urlParams.get("snow") === "1");
 
@@ -136,7 +140,12 @@ window.onload = function () {
   });
 
   document.getElementById("autocomplete").onkeydown = (e) => {
-    if (e.keyCode === 13) { redirect_to_zip_using_address(document.getElementById("autocomplete").value); return false; }
+    if (e.keyCode === 13) { 
+        new google.maps.Geocoder().geocode({ address: document.getElementById("autocomplete").value }, (results, status) => {
+            if (status === 'OK') redirect_to_zip_using_latlng(results[0].geometry.location.lat(), results[0].geometry.location.lng());
+        });
+        return false; 
+    }
   };
   
   if (urlParams.has("zip")) {
@@ -145,30 +154,27 @@ window.onload = function () {
     fetch(URL_BASE + "zipcity.php", { method: 'POST', body: formData })
     .then(r => r.text().then(text => ({ text, url: r.url })))
     .then(({text, url}) => {
-        const doc = new DOMParser().parseFromString(text, 'text/html');
         const urlParamsRedirected = new URLSearchParams(url.split("?")[1]);
         currentLat = parseFloat(urlParamsRedirected.get("lat"));
         currentLon = parseFloat(urlParamsRedirected.get("lon"));
 
-        let cityName = urlParamsRedirected.get("CityName") || "";
-        let state = urlParamsRedirected.get("state") || "";
-        if (!cityName) {
-            const h2 = doc.querySelector("h2")?.textContent || doc.querySelector(".panel-title")?.textContent;
-            if (h2) {
-                const parts = h2.replace(/\s+/g, ' ').trim().split(', ');
-                cityName = parts[0]; state = parts.length > 1 ? parts[1] : "";
-            }
-        }
-        document.getElementById("citystatezip").textContent = (cityName || "Location") + (state ? ", " + state : "") + " (" + urlParams.get("zip") + ") : ";
-        
         if (currentLat && currentLon) {
 			document.getElementById("radarLinks").innerHTML =
 				`<a href="https://radar.weather.gov/?center=${currentLat},${currentLon}&zoom=8" target="_blank">NWS</a> | ` +
 				`<a href="https://www.windy.com/?radar,${currentLat},${currentLon},8" target="_blank">Windy</a> | ` +
                 `<button onclick="openRadarModal()">Radar Popup</button>`;
-            
-             return fetch(`${URL_BASE}MapClick.php?lat=${currentLat}&lon=${currentLon}&unit=0&lg=english&FcstType=graphical`);
         }
+        
+        let cityName = urlParamsRedirected.get("CityName") || "";
+        let state = urlParamsRedirected.get("state") || "";
+        if (!cityName) {
+            const h2 = new DOMParser().parseFromString(text, 'text/html').querySelector("h2")?.textContent || "";
+            const parts = h2.replace(/\s+/g, ' ').trim().split(', ');
+            cityName = parts[0]; state = parts.length > 1 ? parts[1] : "";
+        }
+        document.getElementById("citystatezip").textContent = (cityName || "Location") + (state ? ", " + state : "") + " (" + urlParams.get("zip") + ") : ";
+        
+        return fetch(`${URL_BASE}MapClick.php?lat=${currentLat}&lon=${currentLon}&unit=0&lg=english&FcstType=graphical`);
     })
     .then(resp => resp?.text())
     .then(dataForecast => {
