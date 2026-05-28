@@ -118,7 +118,6 @@ window.onload = function () {
 
         let cityName = urlParamsRedirected.get("CityName") || "";
         let state = urlParamsRedirected.get("state") || "";
-        
         if (!cityName) {
             const h2 = doc.querySelector("h2")?.textContent || doc.querySelector(".panel-title")?.textContent;
             if (h2) {
@@ -139,11 +138,11 @@ window.onload = function () {
         const img = doc.querySelector("img[src*='meteograms/Plotter.php']");
         if (!img) return;
         
-        // --- FORCE NWS DOMAIN ---
-        let imgSrc = img.getAttribute('src');
-        if (imgSrc.startsWith('/')) imgSrc = 'https://forecast.weather.gov' + imgSrc;
+        // --- FIXED: FORCING ABSOLUTE URL ---
+        let rawSrc = img.getAttribute('src');
+        let fullImgUrl = rawSrc.startsWith('http') ? rawSrc : URL_BASE + rawSrc.replace(/^\//, '');
         
-        const [base, query] = imgSrc.split('?');
+        const [base, query] = fullImgUrl.split('?');
         const params = new URLSearchParams(query);
         const pcmd = params.get("pcmd");
         
@@ -151,7 +150,7 @@ window.onload = function () {
         const finalSnow = urlParams.get("snow") !== null ? (urlParams.get("snow") === "1") : (pcmd.substring(10, 14) !== '0000');
         
         let newPcmd = finalThunder ? showThunder(pcmd) : hideThunder(pcmd);
-        newPcmd = finalSnow ? showSnow(newPcmd) : hideSnow(newPcmd);
+        newPcmd = finalSnow ? showSnow(newPcmd) : hideSnow(pcmd);
         params.set("pcmd", newPcmd);
 
         document.getElementById("img1").src = base + "?" + params.toString();
