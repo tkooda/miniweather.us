@@ -123,19 +123,19 @@ window.onload = function () {
   const chkThunder = document.getElementById("chkThunder");
   const chkSnow = document.getElementById("chkSnow");
   const chkRain = document.getElementById("chkRain");
-  const chkAtmosphere = document.getElementById("chkAtmosphere");
+  const chkAtmo = document.getElementById("chkAtmo");
 
-  // Force unchecked unless specified in URL
   chkThunder.checked = (urlParams.get("thunder") === "1");
-  chkAtmosphere.checked = (urlParams.get("atmo") === "1");
+  chkAtmo.checked = (urlParams.get("atmo") === "1");
   
   // Snow and Rain can default to their NWS state if user hasn't specified
   chkSnow.checked = (urlParams.has("snow") ? urlParams.get("snow") === "1" : true);
   chkRain.checked = (urlParams.has("rain") ? urlParams.get("rain") === "1" : true);
 
-  [chkThunder, chkSnow, chkRain, chkAtmosphere].forEach(el => {
+  [chkThunder, chkSnow, chkRain, chkAtmo].forEach(el => {
       el.addEventListener('change', (e) => {
           const key = e.target.id.replace('chk', '').toLowerCase();
+          
           var u = new URL(window.location.href); 
           u.searchParams.set(key, e.target.checked ? "1" : "0"); 
           window.location.href = u.href; 
@@ -194,16 +194,17 @@ window.onload = function () {
         
         let newPcmd = hideHeatIndex(pcmd);
         
-        // Logical check: Use URL params, fallback to pcmd bit check
+        // Logical check: Use URL params, fallback to pcmd bit check for Snow/Rain only
+        // Thunder/Atmo remain forced by checkbox state (ignoring original bits)
         chkThunder.checked = (urlParams.has("thunder") ? urlParams.get("thunder") === "1" : false);
-        chkAtmosphere.checked = (urlParams.has("atmo") ? urlParams.get("atmo") === "1" : false);
+        chkAtmo.checked = (urlParams.has("atmo") ? urlParams.get("atmo") === "1" : false);
         chkSnow.checked = (urlParams.has("snow") ? urlParams.get("snow") === "1" : (pcmd.charAt(10) === '1'));
         chkRain.checked = (urlParams.has("rain") ? urlParams.get("rain") === "1" : (pcmd.charAt(8) === '1'));
         
         newPcmd = chkThunder.checked ? showThunder(newPcmd) : hideThunder(newPcmd);
         newPcmd = chkSnow.checked ? showSnow(newPcmd) : hideSnow(newPcmd);
         newPcmd = chkRain.checked ? showRain(newPcmd) : hideRain(newPcmd);
-        newPcmd = chkAtmosphere.checked ? showAtmo(newPcmd) : hideAtmo(newPcmd);
+        newPcmd = chkAtmo.checked ? showAtmo(newPcmd) : hideAtmo(newPcmd);
         params.set("pcmd", newPcmd);
 
         document.getElementById("img1").src = base + "?" + params.toString();
@@ -230,7 +231,7 @@ window.onload = function () {
     <label class="checkbox-label"><input type="checkbox" id="chkThunder"> Thunder</label>
     <label class="checkbox-label"><input type="checkbox" id="chkSnow"> Snow</label>
     <label class="checkbox-label"><input type="checkbox" id="chkRain"> Rain</label>
-    <label class="checkbox-label"><input type="checkbox" id="chkAtmosphere"> Atmosphere</label>
+    <label class="checkbox-label"><input type="checkbox" id="chkAtmo"> Atmosphere</label>
   </div>
 </td>
 <td align="right" id="radarLinks"></td>
