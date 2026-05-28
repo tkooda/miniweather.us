@@ -151,7 +151,7 @@ window.onload = function () {
 
         if (currentLat && currentLon) {
 			document.getElementById("radarLinks").innerHTML =
-				`<a href="https://radar.weather.gov/?center=${currentLat},${currentLon}&zoom=8" target="_blank">NWS</a> | ` +
+				`Radar: <a href="https://radar.weather.gov/?center=${currentLat},${currentLon}&zoom=8" target="_blank">NWS</a> | ` +
 				`<a href="https://www.windy.com/?radar,${currentLat},${currentLon},8" target="_blank">Windy</a> | ` +
 				`<a href="https://www.rainviewer.com/weather-radar-map-live.html?lat=${currentLat}&lon=${currentLon}&zoom=8" target="_blank">RainViewer</a>`;
         }
