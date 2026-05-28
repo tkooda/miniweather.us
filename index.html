@@ -11,11 +11,9 @@
 </head>
 
 <body>
-
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCILANmgIcwkai7OlOpUj03Jhp5yRXV48A&libraries=geocoding,places&loading=async&callback=initAutocomplete" async defer></script>
 
 <script type="text/javascript">
-
 String.prototype.replaceAt = function(index, replacement) {
     return this.substr(0, index) + replacement + this.substr(index + replacement.length);
 }
@@ -35,11 +33,8 @@ function fallbackToIPLocation() {
 }
 
 function redirect_to_zip_using_latlng(lat, lng) {
-  if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
-      setTimeout(() => redirect_to_zip_using_latlng(lat, lng), 100);
-      return;
-  }
-  new google.maps.Geocoder().geocode({ 'location': {lat, lng} }, function(results, status) {
+  const geocoder = new google.maps.Geocoder();
+  geocoder.geocode({ 'location': {lat, lng} }, function(results, status) {
     if (status === "OK") {
       let zipCode = results.flatMap(r => r.address_components).find(c => c.types.includes('postal_code'))?.long_name;
       if (zipCode) {
@@ -51,19 +46,16 @@ function redirect_to_zip_using_latlng(lat, lng) {
   });
 }
 
-function redirect_to_zip_using_address(address) {
-  new google.maps.Geocoder().geocode({ address: address, region: 'us' }, (results, status) => {
-    if (status === 'OK') redirect_to_zip_using_latlng(results[0].geometry.location.lat(), results[0].geometry.location.lng());
-  });
-}
-
 function initAutocomplete() {
   const autocomplete = new google.maps.places.Autocomplete(document.getElementById('autocomplete'), {types: ['geocode']});
   autocomplete.addListener('place_changed', () => {
     const place = autocomplete.getPlace();
-    if (place.formatted_address) redirect_to_zip_using_address(place.formatted_address);
+    if (place.geometry) {
+        redirect_to_zip_using_latlng(place.geometry.location.lat(), place.geometry.location.lng());
+    }
   });
 
+  // Auto-Geolocation Trigger
   const urlParams = new URLSearchParams(window.location.search);
   if (!urlParams.has("zip")) {
     if (navigator.geolocation) {
@@ -91,7 +83,6 @@ const URL_BASE = "https://forecast.weather.gov/";
 window.onload = function () {
   const urlParams = new URLSearchParams(window.location.search);
   
-  // UI Syncing
   if (urlParams.get("thunder") !== null) document.getElementById("chkThunder").checked = (urlParams.get("thunder") === "1");
   if (urlParams.get("snow") !== null) document.getElementById("chkSnow").checked = (urlParams.get("snow") === "1");
 
@@ -102,10 +93,6 @@ window.onload = function () {
     var u = new URL(window.location.href); u.searchParams.set("snow", e.target.checked ? "1" : "0"); window.location.href = u.href; 
   });
 
-  document.getElementById("autocomplete").onkeydown = (e) => {
-    if (e.keyCode === 13) { redirect_to_zip_using_address(document.getElementById("autocomplete").value); return false; }
-  };
-  
   if (urlParams.has("zip")) {
     const formData = new FormData(); formData.append('inputstring', urlParams.get("zip"));
     
@@ -113,36 +100,34 @@ window.onload = function () {
     .then(r => r.text().then(text => ({ text, url: r.url })))
     .then(({text, url}) => {
         const doc = new DOMParser().parseFromString(text, 'text/html');
-        
-        // --- RESILIENT CITY/STATE EXTRACTION ---
-        let cityName = "Location", state = "";
-        try {
-            const params = new URLSearchParams(url.split("?")[1]);
-            cityName = params.get("CityName") || "";
-            state = params.get("state") || "";
-        } catch(e) {}
-        
+        const urlParamsRedirected = new URLSearchParams(url.split("?")[1]);
+        const lat = urlParamsRedirected.get("lat");
+        const lon = urlParamsRedirected.get("lon");
+
+        // 1. Extract City Name
+        let cityName = urlParamsRedirected.get("CityName") || "";
+        let state = urlParamsRedirected.get("state") || "";
         if (!cityName) {
             const h2 = doc.querySelector("h2")?.textContent || doc.querySelector(".panel-title")?.textContent;
             if (h2) {
                 const parts = h2.replace(/\s+/g, ' ').trim().split(', ');
-                cityName = parts[0];
-                state = parts.length > 1 ? parts[1] : "";
+                cityName = parts[0]; state = parts.length > 1 ? parts[1] : "";
             }
         }
         document.getElementById("citystatezip").textContent = (cityName || "Location") + (state ? ", " + state : "") + " (" + urlParams.get("zip") + ") : ";
         
-        // --- RESILIENT IMAGE SELECTOR ---
-        const forecastLink = doc.querySelector("a[href*='hourlyweather.png']");
-        if (!forecastLink) { console.error("Forecast link not found."); return; }
-        return fetch(forecastLink.href);
+        // 2. Build Forecast URL directly from coordinates (NO HTML PARSING)
+        if (lat && lon) {
+             const forecastUrl = `${URL_BASE}MapClick.php?lat=${lat}&lon=${lon}&unit=0&lg=english&FcstType=graphical`;
+             return fetch(forecastUrl);
+        }
+        throw new Error("Coordinates not found");
     })
-    .then(r => r?.text())
+    .then(resp => resp.text())
     .then(dataForecast => {
-        if (!dataForecast) return;
         const doc = new DOMParser().parseFromString(dataForecast, 'text/html');
         const img = doc.querySelector("img[src*='meteograms/Plotter.php']");
-        if (!img) { console.error("Plotter image not found."); return; }
+        if (!img) return;
         
         const [base, query] = img.src.split('?');
         const params = new URLSearchParams(query);
@@ -152,7 +137,7 @@ window.onload = function () {
         const finalSnow = urlParams.get("snow") !== null ? (urlParams.get("snow") === "1") : (pcmd.substring(10, 14) !== '0000');
         
         let newPcmd = finalThunder ? showThunder(pcmd) : hideThunder(pcmd);
-        newPcmd = finalSnow ? showSnow(newPcmd) : hideSnow(newPcmd);
+        newPcmd = finalSnow ? showSnow(newPcmd) : hideSnow(pcmd);
         params.set("pcmd", newPcmd);
 
         document.getElementById("img1").src = base + "?" + params.toString();
@@ -169,7 +154,6 @@ window.onload = function () {
   <a href="/">MiniWeather.US</a> :
   <span id="citystatezip"></span>
   <input id="autocomplete" placeholder="Enter a city or zipcode" type="text" style="width:160px;"></input>
-  
   <div class="controls-container">
     <button type="button" class="gps-btn" id="gpsBtn" onclick="manualGeolocate()" title="Use Current Location">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="#444">
