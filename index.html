@@ -10,37 +10,13 @@
   .gps-btn { background: none; border: none; cursor: pointer; padding: 2px 4px; display: flex; align-items: center; }
   .checkbox-label { font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
   
-  /* Mobile: Horizontal scroll, images constrained to 80vh to allow pinch-zoom */
   @media (max-width: 767px) {
-    .weather-images {
-      display: flex;
-      overflow-x: auto;
-      overflow-y: hidden;
-      -webkit-overflow-scrolling: touch;
-      touch-action: pan-x pan-y;
-      gap: 0;
-    }
-    .weather-images img {
-      flex: 0 0 auto;
-      max-height: 80vh;
-      width: auto;
-      object-fit: contain;
-      display: block;
-    }
+    .weather-images { display: flex; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; gap: 0; }
+    .weather-images img { flex: 0 0 auto; max-height: 80vh; width: auto; object-fit: contain; display: block; }
   }
-
-  /* Desktop: Vertical stack */
   @media (min-width: 768px) {
-    .weather-images {
-      display: block;
-      overflow-x: visible;
-    }
-    .weather-images img {
-      width: 100%;
-      height: auto;
-      margin-bottom: 40px;
-      display: block;
-    }
+    .weather-images { display: block; overflow-x: visible; }
+    .weather-images img { width: 100%; height: auto; margin-bottom: 40px; display: block; }
   }
 </style>
 </head>
@@ -50,23 +26,21 @@
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCILANmgIcwkai7OlOpUj03Jhp5yRXV48A&libraries=geocoding,places&loading=async&callback=initAutocomplete" async defer></script>
 
 <script type="text/javascript">
-// Utility Functions
 String.prototype.replaceAt = function(index, replacement) {
     return this.substr(0, index) + replacement + this.substr(index + replacement.length);
 }
-// 5,6,7=Atmo, 8=Rain, 9=Thunder, 10=Snow, 11=FzRain, 12=Sleet, 13=Spray
+// 5,6,7=Atmo, 8=Rain, 9=Thunder, 10=Snow
 function hideAtmo(s)    { return s.replaceAt(5, "000"); }
 function showAtmo(s)    { return s.replaceAt(5, "111"); }
 function hideRain(s)    { return s.replaceAt(8, "0"); }
 function showRain(s)    { return s.replaceAt(8, "1"); }
 function hideThunder(s) { return s.replaceAt(9, "0"); }
 function showThunder(s) { return s.replaceAt(9, "1"); }
-function hideSnow(s)    { return s.replaceAt(10, "0000"); }
-function showSnow(s)    { return s.replaceAt(10, "1000"); }
+function hideSnow(s)    { return s.replaceAt(10, "0"); }
+function showSnow(s)    { return s.replaceAt(10, "1"); }
 
 let currentLat = null, currentLon = null;
 
-// Location Helpers
 function fallbackToIPLocation() {
     fetch('https://ipapi.co/json/').then(r => r.json()).then(data => {
         if (data?.postal) {
@@ -132,16 +106,16 @@ const URL_BASE = "https://forecast.weather.gov/";
 window.onload = function () {
   const urlParams = new URLSearchParams(window.location.search);
   
-  // UI Setup
   const chkThunder = document.getElementById("chkThunder");
   const chkSnow = document.getElementById("chkSnow");
   const chkRain = document.getElementById("chkRain");
   const chkAtmosphere = document.getElementById("chkAtmosphere");
 
-  if (urlParams.get("thunder") !== null) chkThunder.checked = (urlParams.get("thunder") === "1");
-  if (urlParams.get("snow") !== null) chkSnow.checked = (urlParams.get("snow") === "1");
-  if (urlParams.get("rain") !== null) chkRain.checked = (urlParams.get("rain") === "1");
-  if (urlParams.get("atmo") !== null) chkAtmosphere.checked = (urlParams.get("atmo") === "1");
+  // Default to unchecked unless specifically set in URL
+  chkThunder.checked = (urlParams.get("thunder") === "1");
+  chkSnow.checked = (urlParams.get("snow") === "1");
+  chkRain.checked = (urlParams.get("rain") === "1");
+  chkAtmosphere.checked = (urlParams.get("atmo") === "1");
 
   [chkThunder, chkSnow, chkRain, chkAtmosphere].forEach(el => {
       el.addEventListener('change', (e) => {
@@ -202,21 +176,12 @@ window.onload = function () {
         const params = new URLSearchParams(query);
         const pcmd = params.get("pcmd");
         
-        // Group Logic: Check if ANY relevant bit is '1'
-        const finalThunder = urlParams.get("thunder") !== null ? (urlParams.get("thunder") === "1") : (pcmd.charAt(9) === '1');
-        const finalSnow = urlParams.get("snow") !== null ? (urlParams.get("snow") === "1") : (pcmd.substring(10, 14) === '1000');
-        const finalRain = urlParams.get("rain") !== null ? (urlParams.get("rain") === "1") : (pcmd.charAt(8) === '1');
-        const finalAtmo = urlParams.get("atmo") !== null ? (urlParams.get("atmo") === "1") : false;
-        
-        chkThunder.checked = finalThunder;
-        chkSnow.checked = finalSnow;
-        chkRain.checked = finalRain;
-        chkAtmosphere.checked = finalAtmo;
-        
-        let newPcmd = finalThunder ? showThunder(pcmd) : hideThunder(pcmd);
-        newPcmd = finalSnow ? showSnow(newPcmd) : hideSnow(newPcmd);
-        newPcmd = finalRain ? showRain(newPcmd) : hideRain(newPcmd);
-        newPcmd = finalAtmo ? showAtmo(newPcmd) : hideAtmo(newPcmd);
+        // Final state reflects URL parameters
+        let newPcmd = pcmd;
+        newPcmd = chkThunder.checked ? showThunder(newPcmd) : hideThunder(newPcmd);
+        newPcmd = chkSnow.checked ? showSnow(newPcmd) : hideSnow(newPcmd);
+        newPcmd = chkRain.checked ? showRain(newPcmd) : hideRain(newPcmd);
+        newPcmd = chkAtmosphere.checked ? showAtmo(newPcmd) : hideAtmo(newPcmd);
         params.set("pcmd", newPcmd);
 
         document.getElementById("img1").src = base + "?" + params.toString();
