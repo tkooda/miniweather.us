@@ -10,13 +10,16 @@
   .gps-btn { background: none; border: none; cursor: pointer; padding: 2px 4px; display: flex; align-items: center; }
   .checkbox-label { font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
   
+  /* Mobile: Horizontal scroll */
   @media (max-width: 767px) {
-    .weather-images { display: flex; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; gap: 0; }
-    .weather-images img { flex: 0 0 auto; max-height: 80vh; width: auto; object-fit: contain; display: block; }
+    .weather-images { display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 0; }
+    .weather-images img { flex: 0 0 auto; width: 100%; height: auto; object-fit: contain; }
   }
+
+  /* Desktop: Vertical stack with spacing */
   @media (min-width: 768px) {
-    .weather-images { display: block; overflow-x: visible; }
-    .weather-images img { width: 100%; height: auto; margin-bottom: 40px; display: block; }
+    .weather-images { display: block; }
+    .weather-images img { width: 100%; margin-bottom: 40px; }
   }
 </style>
 </head>
@@ -26,21 +29,23 @@
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCILANmgIcwkai7OlOpUj03Jhp5yRXV48A&libraries=geocoding,places&loading=async&callback=initAutocomplete" async defer></script>
 
 <script type="text/javascript">
+// Utility Functions
 String.prototype.replaceAt = function(index, replacement) {
     return this.substr(0, index) + replacement + this.substr(index + replacement.length);
 }
-// 5,6,7=Atmo, 8=Rain, 9=Thunder, 10=Snow
+// Bits: 5,6,7=Atmo, 8=Rain, 9=Thunder, 10=Snow (only 10)
 function hideAtmo(s)    { return s.replaceAt(5, "000"); }
 function showAtmo(s)    { return s.replaceAt(5, "111"); }
 function hideRain(s)    { return s.replaceAt(8, "0"); }
 function showRain(s)    { return s.replaceAt(8, "1"); }
 function hideThunder(s) { return s.replaceAt(9, "0"); }
 function showThunder(s) { return s.replaceAt(9, "1"); }
-function hideSnow(s)    { return s.replaceAt(10, "0"); }
-function showSnow(s)    { return s.replaceAt(10, "1"); }
+function hideSnow(s)    { return s.replaceAt(10, "0000"); }
+function showSnow(s)    { return s.replaceAt(10, "1000"); }
 
 let currentLat = null, currentLon = null;
 
+// Location Helpers
 function fallbackToIPLocation() {
     fetch('https://ipapi.co/json/').then(r => r.json()).then(data => {
         if (data?.postal) {
@@ -111,7 +116,6 @@ window.onload = function () {
   const chkRain = document.getElementById("chkRain");
   const chkAtmosphere = document.getElementById("chkAtmosphere");
 
-  // Default to unchecked unless specifically set in URL
   chkThunder.checked = (urlParams.get("thunder") === "1");
   chkSnow.checked = (urlParams.get("snow") === "1");
   chkRain.checked = (urlParams.get("rain") === "1");
@@ -176,7 +180,12 @@ window.onload = function () {
         const params = new URLSearchParams(query);
         const pcmd = params.get("pcmd");
         
-        // Final state reflects URL parameters
+        // Logical check: Use URL params, fallback to pcmd bit check
+        chkThunder.checked = (urlParams.get("thunder") === "1") || (!urlParams.has("thunder") && pcmd.charAt(9) === '1');
+        chkSnow.checked = (urlParams.get("snow") === "1") || (!urlParams.has("snow") && pcmd.charAt(10) === '1');
+        chkRain.checked = (urlParams.get("rain") === "1") || (!urlParams.has("rain") && pcmd.charAt(8) === '1');
+        chkAtmosphere.checked = (urlParams.get("atmo") === "1") || (!urlParams.has("atmo") && pcmd.substring(5, 8) === '111');
+        
         let newPcmd = pcmd;
         newPcmd = chkThunder.checked ? showThunder(newPcmd) : hideThunder(newPcmd);
         newPcmd = chkSnow.checked ? showSnow(newPcmd) : hideSnow(newPcmd);
