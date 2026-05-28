@@ -45,11 +45,27 @@ function showThunder(s) { return s.replaceAt(9, "1"); }
 function hideSnow(s)    { return s.replaceAt(10, "0000"); }
 function showSnow(s)    { return s.replaceAt(10, "1111"); }
 
+// IP Location Fallback for strict privacy browsers
+function fallbackToIPLocation() {
+    console.log("Native Geolocation failed/blocked. Attempting IP fallback...");
+    fetch('https://ipapi.co/json/')
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.postal) {
+                var url = new URL(window.location.href);
+                url.search = ""; 
+                url.searchParams.set("zip", data.postal);
+                window.location.href = url.href;
+            } else {
+                console.warn("IP Fallback failed to find a postal code.");
+            }
+        })
+        .catch(err => console.error("IP Fallback network error:", err));
+}
+
 // redirect to "?zip=$zip" using latitude + longitude ..
 function redirect_to_zip_using_latlng( lat, lng ) {
-  // Ensure the Google Maps library is fully loaded before executing
   if (typeof google === 'undefined' || typeof google.maps === 'undefined' || typeof google.maps.Geocoder === 'undefined') {
-      console.warn("Maps API not ready yet. Retrying in 100ms...");
       setTimeout(() => redirect_to_zip_using_latlng(lat, lng), 100);
       return;
   }
@@ -60,8 +76,6 @@ function redirect_to_zip_using_latlng( lat, lng ) {
   geocoder.geocode( { 'location': latlng }, function(results, status) {
     if ( status === "OK" ) {
       let zipCode = null;
-      
-      // Look through ALL returned results to find the postal code
       for (let i = 0; i < results.length; i++) {
         for (let j = 0; j < results[i].address_components.length; j++) {
           if (results[i].address_components[j].types.indexOf('postal_code') !== -1) {
@@ -74,20 +88,18 @@ function redirect_to_zip_using_latlng( lat, lng ) {
 
       if (zipCode) {
         var url = new URL(window.location.href);
-        // Only set zip. Drop thunder/snow params so the new location defaults to NWS data.
         url.search = ""; 
         url.searchParams.set("zip", zipCode);
         window.location.href = url.href;
       } else {
-        console.error('Geocode succeeded but no postal_code was found.');
+        fallbackToIPLocation(); 
       }
     } else {
-      console.error('Geocode was not successful for the following reason: ' + status);
+      fallbackToIPLocation(); 
     }
   });
 }
 
-// redirect to /zip/$zip using (e.g.) "city, state, country" ..
 function redirect_to_zip_using_address( address ) {
   const geocoder = new google.maps.Geocoder();
   const request = {
@@ -110,6 +122,24 @@ function initAutocomplete() {
     {types: ['geocode']}
   );
   autocomplete.addListener('place_changed', processAddress);
+
+  // Auto-Geolocation Trigger on root visits
+  const urlParams = new URLSearchParams(window.location.search);
+  if (!urlParams.has("zip")) {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          redirect_to_zip_using_latlng(position.coords.latitude, position.coords.longitude);
+        },
+        function(error) {
+          fallbackToIPLocation(); 
+        },
+        { timeout: 5000 }
+      );
+    } else {
+      fallbackToIPLocation();
+    }
+  }
 }
 
 function processAddress() {
@@ -146,13 +176,20 @@ function processAddress() {
 
 function manualGeolocate() {
   if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(function(position) {
-      redirect_to_zip_using_latlng( position.coords.latitude, position.coords.longitude );
-    });
+    navigator.geolocation.getCurrentPosition(
+      function(position) {
+        redirect_to_zip_using_latlng( position.coords.latitude, position.coords.longitude );
+      },
+      function(error) {
+        fallbackToIPLocation();
+      },
+      { timeout: 5000 }
+    );
+  } else {
+    fallbackToIPLocation();
   }
 }
 
-// Safely biases the Google Maps Autocomplete without triggering permission prompts
 function safeBiasGeolocate() {
   if (navigator.geolocation && navigator.permissions) {
     navigator.permissions.query({name: 'geolocation'}).then(function(result) {
@@ -175,17 +212,15 @@ function safeBiasGeolocate() {
   }
 }
 
-// Checkbox event logic forces explicit "1" or "0"
 function toggleQueryParam(param, isChecked) {
   var url = new URL(window.location.href);
   url.searchParams.set(param, isChecked ? "1" : "0");
   window.location.href = url.href;
 }
 
-// main()..
 const URL_BASE = "https://forecast.weather.gov/";
 const urlParamsBase = new URLSearchParams( window.location.search );
-var autocomplete; // global
+var autocomplete; 
 
 window.onload = function () {
 
@@ -208,15 +243,12 @@ window.onload = function () {
     });
   }
   
-  // Read URL overrides (returns null if user hasn't explicitly interacted yet)
   const userThunder = urlParamsBase.get("thunder");
   const userSnow = urlParamsBase.get("snow");
 
-  // Pre-check boxes ONLY if explicitly forced via URL before NWS data loads
   if (userThunder !== null) document.getElementById("chkThunder").checked = (userThunder === "1");
   if (userSnow !== null) document.getElementById("chkSnow").checked = (userSnow === "1");
 
-  // Bind UI Checkbox change events
   document.getElementById("chkThunder").addEventListener('change', function() {
     toggleQueryParam("thunder", this.checked);
   });
@@ -251,19 +283,15 @@ window.onload = function () {
                      
                      var pcmd = urlParamsImg.get("pcmd");
                      
-                     // Determine native NWS defaults from the raw string
                      var nwsThunder = pcmd.charAt(9) === '1';
-                     var nwsSnow = pcmd.substring(10, 14) !== '0000'; // Any non-zero here means snow/sleet is natively present
+                     var nwsSnow = pcmd.substring(10, 14) !== '0000'; 
                      
-                     // Resolve final states: Explicit URL overrides take precedence, otherwise fallback to NWS
                      var finalThunder = userThunder !== null ? (userThunder === "1") : nwsThunder;
                      var finalSnow = userSnow !== null ? (userSnow === "1") : nwsSnow;
                      
-                     // Dynamically update UI checkboxes so the user sees the true state
                      document.getElementById("chkThunder").checked = finalThunder;
                      document.getElementById("chkSnow").checked = finalSnow;
                      
-                     // Apply final states to the pcmd string
                      pcmd = finalThunder ? showThunder(pcmd) : hideThunder(pcmd);
                      pcmd = finalSnow ? showSnow(pcmd) : hideSnow(pcmd);
                      
@@ -277,20 +305,6 @@ window.onload = function () {
                  });
               }
             });
-
-  } else {
-    // Attempt aggressive geolocation on root URL visit.
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        function(position) {
-          redirect_to_zip_using_latlng(position.coords.latitude, position.coords.longitude);
-        },
-        function(error) {
-          // Fail silently if denied or blocked
-          console.warn("Auto-geolocation failed or was denied.");
-        }
-      );
-    }
   }
 }
 </script>
