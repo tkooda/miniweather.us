@@ -4,39 +4,18 @@
 <title>MiniWeather.US</title>
 <link rel="icon" href="data:;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAD////////////////////////////+/v///v3///79///+/f///v3///79/////v////////////////////////////////////////79///////z1LD/8tOt//LPpv/z0qz/89Sw//DImf/+/Pn///////////////////////////////////////7+/f//////+erY/+uuav/uuoH/7ruD/+23e//stHb/89Co///////9/Pv///////////////////////////////////7+///////43b7/+eTL//ngxf/54MT/+eTL//jdv/////////79//////////////////7+////////+vr5/8TCwv+5tbT/vL3B/7u8v/+7vMD/u7zA/7u8v/+8vcH/uLW0/9bV1f/////////////////+/v7//////8XFxf+9u7v/4uDe/93Z1//d2tj/3drY/93a2P/d2tj/3drY/9/c2/+vq6r/3dzc////////////7/n8//L////GvLj/3dbT//Dw8P/r6Of/7Orp/+zq6f/s6un/7Orp/+rp6P/z8vH/2NTT/8G/vv///////////9Hw/P9z1v7/vdzp/4eZo//j3dr/6uzr/+fl5P/p5uX/6efm/+jm5f/o5uX/6efm/7Swr//a2Nj////////////m+P7/7vf8/0LR//8SyN7/v62o//Hk4//s6en/6Ofm/+jm5f/n5eT/7+3s/8K/vv/Avr3///////7+/v////7/gNj7/7fl/P80yPv/APj//zvO0/+Orqz/r7Gu/+3q6f/s6+r/6ujn//Px8P+zsK//5+fn///////+/v7///////j9/v/S8fz/Z8/7/wDR/f8F9v7/AN3//1anxv/Cs67/3d3d/+Th4P+9ubj/vbu6///////+/v7////////////K7vz/e9b7/+35/P9q0Pv/Psr7/1nM/P/V9P//3dfV/7Wzs/+2s7P/y8nJ//z8/P///////////////////////f7///////9u0vr/1fL8/7Hl/P/j9v3/adD6//X8/////////v/////////+/v7////////////////////////////8/v//0/H9//3+//931fv/6vn+/9r0/f/0+/3///////7////+/f3////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////9/v////////7//////////f7/////////////////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==">
 <style>
-  .controls-container {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: 5px;
-  }
-  .gps-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 2px 4px;
-    display: flex;
-    align-items: center;
-  }
-  .checkbox-label {
-    font-family: sans-serif;
-    font-size: 14px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
+  .controls-container { display: inline-flex; align-items: center; gap: 8px; margin-left: 5px; }
+  .gps-btn { background: none; border: none; cursor: pointer; padding: 2px 4px; display: flex; align-items: center; }
+  .checkbox-label { font-family: sans-serif; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
 </style>
 </head>
 
 <body>
 
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCILANmgIcwkai7OlOpUj03Jhp5yRXV48A&libraries=geocoding,places&loading=async&callback=initAutocomplete" async defer></script>
 
 <script type="text/javascript">
 
-// utility functions
 String.prototype.replaceAt = function(index, replacement) {
     return this.substr(0, index) + replacement + this.substr(index + replacement.length);
 }
@@ -45,7 +24,6 @@ function showThunder(s) { return s.replaceAt(9, "1"); }
 function hideSnow(s)    { return s.replaceAt(10, "0000"); }
 function showSnow(s)    { return s.replaceAt(10, "1111"); }
 
-// IP Location Fallback
 function fallbackToIPLocation() {
     fetch('https://ipapi.co/json/')
         .then(response => response.json())
@@ -60,180 +38,152 @@ function fallbackToIPLocation() {
         .catch(err => console.error("IP Fallback failed."));
 }
 
-function redirect_to_zip_using_latlng( lat, lng ) {
-  if (typeof google === 'undefined' || typeof google.maps === 'undefined' || typeof google.maps.Geocoder === 'undefined') {
+function redirect_to_zip_using_latlng(lat, lng) {
+  if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
       setTimeout(() => redirect_to_zip_using_latlng(lat, lng), 100);
       return;
   }
-
   const geocoder = new google.maps.Geocoder();
-  const latlng = new google.maps.LatLng( lat, lng );
-  
-  geocoder.geocode( { 'location': latlng }, function(results, status) {
-    if ( status === "OK" ) {
-      let zipCode = null;
-      for (let i = 0; i < results.length; i++) {
-        for (let j = 0; j < results[i].address_components.length; j++) {
-          if (results[i].address_components[j].types.indexOf('postal_code') !== -1) {
-            zipCode = results[i].address_components[j].long_name;
-            break;
-          }
-        }
-        if (zipCode) break;
-      }
-
+  geocoder.geocode({ 'location': {lat, lng} }, function(results, status) {
+    if (status === "OK") {
+      let zipCode = results.flatMap(r => r.address_components).find(c => c.types.includes('postal_code'))?.long_name;
       if (zipCode) {
         var url = new URL(window.location.href);
-        url.search = ""; 
-        url.searchParams.set("zip", zipCode);
+        url.search = ""; url.searchParams.set("zip", zipCode);
         window.location.href = url.href;
-      } else {
-        fallbackToIPLocation(); 
-      }
-    } else {
-      fallbackToIPLocation(); 
-    }
+      } else { fallbackToIPLocation(); }
+    } else { fallbackToIPLocation(); }
   });
 }
 
-function redirect_to_zip_using_address( address ) {
-  const geocoder = new google.maps.Geocoder();
-  geocoder.geocode({ address: address, region: 'us' }, ( results, status ) => {
-    if ( status === 'OK' ) {
-      redirect_to_zip_using_latlng( results[0].geometry.location.lat(), results[0].geometry.location.lng() );
-    }
+function redirect_to_zip_using_address(address) {
+  new google.maps.Geocoder().geocode({ address: address, region: 'us' }, (results, status) => {
+    if (status === 'OK') redirect_to_zip_using_latlng(results[0].geometry.location.lat(), results[0].geometry.location.lng());
   });
 }
 
 function initAutocomplete() {
-  autocomplete = new google.maps.places.Autocomplete(
-    document.getElementById('autocomplete'),
-    {types: ['geocode']}
-  );
-  autocomplete.addListener('place_changed', processAddress);
+  const autocomplete = new google.maps.places.Autocomplete(document.getElementById('autocomplete'), {types: ['geocode']});
+  autocomplete.addListener('place_changed', () => {
+    const place = autocomplete.getPlace();
+    if (place.formatted_address) redirect_to_zip_using_address(place.formatted_address);
+  });
 
   const urlParams = new URLSearchParams(window.location.search);
   if (!urlParams.has("zip")) {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        function(position) {
-          redirect_to_zip_using_latlng(position.coords.latitude, position.coords.longitude);
-        },
-        function(error) {
-          fallbackToIPLocation(); 
-        },
+        (p) => redirect_to_zip_using_latlng(p.coords.latitude, p.coords.longitude),
+        () => fallbackToIPLocation(),
         { timeout: 5000 }
       );
-    } else {
-      fallbackToIPLocation();
-    }
-  }
-}
-
-function processAddress() {
-  var place = autocomplete.getPlace();
-  if (place.address_components) {
-      redirect_to_zip_using_address(place.formatted_address);
+    } else { fallbackToIPLocation(); }
   }
 }
 
 function manualGeolocate() {
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
-        function(position) { redirect_to_zip_using_latlng( position.coords.latitude, position.coords.longitude ); },
-        function(error) { fallbackToIPLocation(); }
+        (p) => redirect_to_zip_using_latlng(p.coords.latitude, p.coords.longitude),
+        () => fallbackToIPLocation(),
+        { timeout: 5000 }
     );
-  } else {
-    fallbackToIPLocation();
-  }
+  } else { fallbackToIPLocation(); }
 }
 
 function safeBiasGeolocate() {
   if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(function(position) {
-      if (autocomplete) {
+    navigator.geolocation.getCurrentPosition((p) => {
+      if (window.autocomplete) {
         const circle = new google.maps.Circle({
-          center: {lat: position.coords.latitude, lng: position.coords.longitude},
-          radius: position.coords.accuracy
+          center: {lat: p.coords.latitude, lng: p.coords.longitude},
+          radius: p.coords.accuracy
         });
-        autocomplete.setBounds(circle.getBounds());
+        window.autocomplete.setBounds(circle.getBounds());
       }
     });
   }
 }
 
-function toggleQueryParam(param, isChecked) {
-  var url = new URL(window.location.href);
-  url.searchParams.set(param, isChecked ? "1" : "0");
-  window.location.href = url.href;
-}
-
 const URL_BASE = "https://forecast.weather.gov/";
-var autocomplete;
 
 window.onload = function () {
   const urlParams = new URLSearchParams(window.location.search);
+  const gpsBtn = document.getElementById("gpsBtn");
 
-  // Dynamically hide/show the GPS button
   if (navigator.geolocation && navigator.permissions) {
-    navigator.permissions.query({name: 'geolocation'}).then(function(result) {
-      const gpsBtn = document.getElementById("gpsBtn");
-      if (result.state === 'granted') { gpsBtn.style.display = 'none'; }
-      result.onchange = function() { gpsBtn.style.display = (this.state === 'granted') ? 'none' : 'flex'; };
+    navigator.permissions.query({name: 'geolocation'}).then(result => {
+      if (result.state === 'granted') gpsBtn.style.display = 'none';
+      result.onchange = () => gpsBtn.style.display = (result.state === 'granted') ? 'none' : 'flex';
     });
   }
   
-  const userThunder = urlParams.get("thunder");
-  const userSnow = urlParams.get("snow");
+  if (urlParams.get("thunder") !== null) document.getElementById("chkThunder").checked = (urlParams.get("thunder") === "1");
+  if (urlParams.get("snow") !== null) document.getElementById("chkSnow").checked = (urlParams.get("snow") === "1");
 
-  if (userThunder !== null) document.getElementById("chkThunder").checked = (userThunder === "1");
-  if (userSnow !== null) document.getElementById("chkSnow").checked = (userSnow === "1");
+  document.getElementById("chkThunder").addEventListener('change', (e) => { 
+    var u = new URL(window.location.href); u.searchParams.set("thunder", e.target.checked ? "1" : "0"); window.location.href = u.href; 
+  });
+  document.getElementById("chkSnow").addEventListener('change', (e) => { 
+    var u = new URL(window.location.href); u.searchParams.set("snow", e.target.checked ? "1" : "0"); window.location.href = u.href; 
+  });
 
-  document.getElementById("chkThunder").addEventListener('change', function() { toggleQueryParam("thunder", this.checked); });
-  document.getElementById("chkSnow").addEventListener('change', function() { toggleQueryParam("snow", this.checked); });
-
-  document.getElementById("autocomplete").onkeydown = function (e) {
-    if ( e.keyCode === 13 ) {
-      redirect_to_zip_using_address( document.getElementById("autocomplete").value );
-      return false;
-    }
-  }
+  document.getElementById("autocomplete").onkeydown = (e) => {
+    if (e.keyCode === 13) { redirect_to_zip_using_address(document.getElementById("autocomplete").value); return false; }
+  };
   
-  if ( urlParams.has("zip") ) {
-    var xhr = new XMLHttpRequest(); 
-    $.ajax( { url: URL_BASE + "zipcity.php", type: "POST", data: { inputstring: urlParams.get("zip") }, success: function( dataCity ) {
-        var pathForecast = $( dataCity ).find( "img[src='newimages/medium/hourlyweather.png']" ).closest("a").attr("href");
+  if (urlParams.has("zip")) {
+    const formData = new FormData(); formData.append('inputstring', urlParams.get("zip"));
+    
+    fetch(URL_BASE + "zipcity.php", { method: 'POST', body: formData })
+    .then(response => {
+        const urlRedirect = response.url;
+        return response.text().then(text => ({ text, urlRedirect }));
+    })
+    .then(({text, urlRedirect}) => {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(text, 'text/html');
+        const pathForecast = doc.querySelector("img[src='newimages/medium/hourlyweather.png']").closest("a").href;
         
-        // --- RESTORED ROBUST CITY/STATE EXTRACTION ---
-        // Get the redirect URL of the actual forecast page request
-        var urlParamsRedirected = new URLSearchParams( xhr.responseURL.split("?")[1] );
-        var cityName = urlParamsRedirected.get("CityName") || "Location";
-        var state = urlParamsRedirected.get("state") || "";
-        $("#citystatezip").html(cityName + ", " + state + " (" + urlParams.get("zip") + ") : ");
-        // ------------------------------------
+        let cityName = "Location", state = "";
+        try {
+            const params = new URLSearchParams(urlRedirect.split("?")[1]);
+            cityName = params.get("CityName") || "";
+            state = params.get("state") || "";
+        } catch(e) {}
+        
+        if (!cityName) {
+            const domMatch = doc.querySelector("h2")?.textContent || doc.querySelector(".panel-title")?.textContent || "Location";
+            const parts = domMatch.replace(/\s+/g, ' ').trim().split(', ');
+            cityName = parts[0];
+            state = parts.length > 1 ? parts[1] : "";
+        }
+        document.getElementById("citystatezip").textContent = (cityName || "Location") + (state ? ", " + state : "") + " (" + urlParams.get("zip") + ") : ";
+        
+        return fetch(pathForecast);
+    })
+    .then(resp => resp.text())
+    .then(dataForecast => {
+        const doc = new DOMParser().parseFromString(dataForecast, 'text/html');
+        const imgPath = doc.querySelector("img[src*='meteograms/Plotter.php']").src;
+        const [base, query] = imgPath.split('?');
+        const params = new URLSearchParams(query);
+        
+        const pcmd = params.get("pcmd");
+        const finalThunder = urlParams.get("thunder") !== null ? (urlParams.get("thunder") === "1") : (pcmd.charAt(9) === '1');
+        const finalSnow = urlParams.get("snow") !== null ? (urlParams.get("snow") === "1") : (pcmd.substring(10, 14) !== '0000');
+        
+        document.getElementById("chkThunder").checked = finalThunder;
+        document.getElementById("chkSnow").checked = finalSnow;
+        
+        let newPcmd = finalThunder ? showThunder(pcmd) : hideThunder(pcmd);
+        newPcmd = finalSnow ? showSnow(newPcmd) : hideSnow(newPcmd);
+        params.set("pcmd", newPcmd);
 
-        $.get( URL_BASE + pathForecast, function( dataForecast ) {
-            var path_img_orig = $( dataForecast ).find( "img[src*='meteograms/Plotter.php']" ).attr("src").split('?');
-            var urlParamsImg = new URLSearchParams( path_img_orig[1] );
-            var pcmd = urlParamsImg.get("pcmd");
-            
-            var nwsThunder = pcmd.charAt(9) === '1';
-            var nwsSnow = pcmd.substring(10, 14) !== '0000';
-            
-            var finalThunder = userThunder !== null ? (userThunder === "1") : nwsThunder;
-            var finalSnow = userSnow !== null ? (userSnow === "1") : nwsSnow;
-            
-            pcmd = finalThunder ? showThunder(pcmd) : hideThunder(pcmd);
-            pcmd = finalSnow ? showSnow(pcmd) : hideSnow(pcmd);
-            urlParamsImg.set("pcmd", pcmd);
-
-            $("#img1").attr( "src", URL_BASE + path_img_orig[0] + "?" + urlParamsImg.toString() );
-            urlParamsImg.set( "ahour", "48" );
-            $("#img2").attr( "src", URL_BASE + path_img_orig[0] + "?" + urlParamsImg.toString() );
-            urlParamsImg.set( "ahour", "96" );
-            $("#img3").attr( "src", URL_BASE + path_img_orig[0] + "?" + urlParamsImg.toString() );
-        });
-    }});
+        document.getElementById("img1").src = base + "?" + params.toString();
+        params.set("ahour", "48"); document.getElementById("img2").src = base + "?" + params.toString();
+        params.set("ahour", "96"); document.getElementById("img3").src = base + "?" + params.toString();
+    });
   }
 }
 </script>
