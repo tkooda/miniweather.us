@@ -116,7 +116,16 @@ window.onload = function () {
         const urlParamsRedirected = new URLSearchParams(url.split("?")[1]);
         const lat = urlParamsRedirected.get("lat");
         const lon = urlParamsRedirected.get("lon");
-
+        
+        if (lat && lon) {
+			const nwsUrl = `https://radar.weather.gov/?center=${lat},${lon}&zoom=8`;
+			const windyUrl = `https://www.windy.com/?radar,${lat},${lon},8`;
+            
+			document.getElementById("radar").innerHTML =
+				`<a href="${nwsUrl}" target="_blank" style="text-decoration:none; color:blue;">NWS Radar</a> | ` +
+				`<a href="${windyUrl}" target="_blank" style="text-decoration:none; color:blue;">Windy Radar</a>`;
+		}
+        
         let cityName = urlParamsRedirected.get("CityName") || "";
         let state = urlParamsRedirected.get("state") || "";
         if (!cityName) {
