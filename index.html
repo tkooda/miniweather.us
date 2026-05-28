@@ -3,10 +3,13 @@
 <head>
 <title>MiniWeather.US</title>
 <link rel="icon" href="data:;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAD////////////////////////////+/v///v3///79///+/f///v3///79/////v////////////////////////////////////////79///////z1LD/8tOt//LPpv/z0qz/89Sw//DImf/+/Pn///////////////////////////////////////7+/f//////+erY/+uuav/uuoH/7ruD/+23e//stHb/89Co///////9/Pv///////////////////////////////////7+///////43b7/+eTL//ngxf/54MT/+eTL//jdv/////////79//////////////////7+////////+vr5/8TCwv+5tbT/vL3B/7u8v/+7vMD/u7zA/7u8v/+8vcH/uLW0/9bV1f/////////////////+/v7//////8XFxf+9u7v/4uDe/93Z1//d2tj/3drY/93a2P/d2tj/3drY/9/c2/+vq6r/3dzc////////////7/n8//L////GvLj/3dbT//Dw8P/r6Of/7Orp/+zq6f/s6un/7Orp/+rp6P/z8vH/2NTT/8G/vv///////////9Hw/P9z1v7/vdzp/4eZo//j3dr/6uzr/+fl5P/p5uX/6efm/+jm5f/o5uX/6efm/7Swr//a2Nj////////////m+P7/7vf8/0LR//8SyN7/v62o//Hk4//s6en/6Ofm/+jm5f/n5eT/7+3s/8K/vv/Avr3///////7+/v////7/gNj7/7fl/P80yPv/APj//zvO0/+Orqz/r7Gu/+3q6f/s6+r/6ujn//Px8P+zsK//5+fn///////+/v7///////j9/v/S8fz/Z8/7/wDR/f8F9v7/AN3//1anxv/Cs67/3d3d/+Th4P+9ubj/vbu6///////+/v7////////////K7vz/e9b7/+35/P9q0Pv/Psr7/1nM/P/V9P//3dfV/7Wzs/+2s7P/y8nJ//z8/P///////////////////////f7///////9u0vr/1fL8/7Hl/P/j9v3/adD6//X8/////////v/////////+/v7////////////////////////////8/v//0/H9//3+//931fv/6vn+/9r0/f/0+/3///////7////+/f3////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////9/v////////7//////////f7/////////////////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==">
+<script src="https://rainviewer.com/integration/map.js" async></script>
 <style>
   .controls-container { display: inline-flex; align-items: center; gap: 8px; margin-left: 5px; }
   .gps-btn { background: none; border: none; cursor: pointer; padding: 2px 4px; display: flex; align-items: center; }
   .checkbox-label { font-family: sans-serif; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+  .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: #fff; }
+  .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; cursor: pointer; z-index: 1001; }
 </style>
 </head>
 
@@ -15,7 +18,6 @@
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCILANmgIcwkai7OlOpUj03Jhp5yRXV48A&libraries=geocoding,places&loading=async&callback=initAutocomplete" async defer></script>
 
 <script type="text/javascript">
-
 String.prototype.replaceAt = function(index, replacement) {
     return this.substr(0, index) + replacement + this.substr(index + replacement.length);
 }
@@ -64,6 +66,7 @@ function initAutocomplete() {
     if (place.formatted_address) redirect_to_zip_using_address(place.formatted_address);
   });
 
+  // RESTORED AUTO-GEOLOCATION BLOCK
   const urlParams = new URLSearchParams(window.location.search);
   if (!urlParams.has("zip")) {
     if (navigator.geolocation) {
@@ -86,12 +89,20 @@ function manualGeolocate() {
   } else { fallbackToIPLocation(); }
 }
 
+let currentLat = null, currentLon = null;
+function openRadarModal() {
+    document.getElementById("radarModal").style.display = "block";
+    if (currentLat && currentLon) {
+        new RainViewerMap({ lat: currentLat, lon: currentLon, zoom: 8, autoplay: true, layers: ['radar'] });
+    }
+}
+function closeRadarModal() { document.getElementById("radarModal").style.display = "none"; }
+
 const URL_BASE = "https://forecast.weather.gov/";
 
 window.onload = function () {
   const urlParams = new URLSearchParams(window.location.search);
   
-  // 1. Initial UI Setup
   if (urlParams.get("thunder") !== null) document.getElementById("chkThunder").checked = (urlParams.get("thunder") === "1");
   if (urlParams.get("snow") !== null) document.getElementById("chkSnow").checked = (urlParams.get("snow") === "1");
 
@@ -114,18 +125,9 @@ window.onload = function () {
     .then(({text, url}) => {
         const doc = new DOMParser().parseFromString(text, 'text/html');
         const urlParamsRedirected = new URLSearchParams(url.split("?")[1]);
-        const lat = urlParamsRedirected.get("lat");
-        const lon = urlParamsRedirected.get("lon");
-        
-        if (lat && lon) {
-			const nwsUrl = `https://radar.weather.gov/?center=${lat},${lon}&zoom=8`;
-			const windyUrl = `https://www.windy.com/?radar,${lat},${lon},8`;
-            
-			document.getElementById("radar").innerHTML =
-				`<a href="${nwsUrl}" target="_blank" style="text-decoration:none; color:blue;">NWS Radar</a> | ` +
-				`<a href="${windyUrl}" target="_blank" style="text-decoration:none; color:blue;">Windy Radar</a>`;
-		}
-        
+        currentLat = parseFloat(urlParamsRedirected.get("lat"));
+        currentLon = parseFloat(urlParamsRedirected.get("lon"));
+
         let cityName = urlParamsRedirected.get("CityName") || "";
         let state = urlParamsRedirected.get("state") || "";
         if (!cityName) {
@@ -137,29 +139,31 @@ window.onload = function () {
         }
         document.getElementById("citystatezip").textContent = (cityName || "Location") + (state ? ", " + state : "") + " (" + urlParams.get("zip") + ") : ";
         
-        if (lat && lon) {
-             return fetch(`${URL_BASE}MapClick.php?lat=${lat}&lon=${lon}&unit=0&lg=english&FcstType=graphical`);
+        if (currentLat && currentLon) {
+			document.getElementById("radarLinks").innerHTML =
+				`<a href="https://radar.weather.gov/?center=${currentLat},${currentLon}&zoom=8" target="_blank">NWS</a> | ` +
+				`<a href="https://www.windy.com/?radar,${currentLat},${currentLon},8" target="_blank">Windy</a> | ` +
+                `<button onclick="openRadarModal()">Radar Popup</button>`;
+            
+             return fetch(`${URL_BASE}MapClick.php?lat=${currentLat}&lon=${currentLon}&unit=0&lg=english&FcstType=graphical`);
         }
-        throw new Error("Coordinates not found");
     })
-    .then(resp => resp.text())
+    .then(resp => resp?.text())
     .then(dataForecast => {
+        if (!dataForecast) return;
         const doc = new DOMParser().parseFromString(dataForecast, 'text/html');
         const img = doc.querySelector("img[src*='meteograms/Plotter.php']");
         if (!img) return;
         
         let imgSrc = img.getAttribute('src');
         let fullImgUrl = imgSrc.startsWith('http') ? imgSrc : URL_BASE + imgSrc.replace(/^\//, '');
-        
         const [base, query] = fullImgUrl.split('?');
         const params = new URLSearchParams(query);
         const pcmd = params.get("pcmd");
         
-        // 2. Logic to apply state and SYNC UI
         const finalThunder = urlParams.get("thunder") !== null ? (urlParams.get("thunder") === "1") : (pcmd.charAt(9) === '1');
         const finalSnow = urlParams.get("snow") !== null ? (urlParams.get("snow") === "1") : (pcmd.substring(10, 14) !== '0000');
         
-        // Sync Checkboxes
         document.getElementById("chkThunder").checked = finalThunder;
         document.getElementById("chkSnow").checked = finalSnow;
         
@@ -192,9 +196,14 @@ window.onload = function () {
     <label class="checkbox-label"><input type="checkbox" id="chkSnow"> Show Snow</label>
   </div>
 </td>
-<td align="right" id="radar"></td>
+<td align="right" id="radarLinks"></td>
 </tr>
 </table>
+
+<div id="radarModal" class="modal">
+    <span class="close-btn" onclick="closeRadarModal()">&times;</span>
+    <div id="rainviewer-map" style="width: 100vw; height: 100vh;"></div>
+</div>
 
 <img id="img1" src="" width="100%"><br/><br/><br/><br/>
 <img id="img2" src="" width="100%"><br/><br/><br/><br/>
