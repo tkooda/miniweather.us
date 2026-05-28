@@ -36,15 +36,19 @@ let currentLat = null, currentLon = null;
 // Modal Logic
 function openRadarModal() {
     document.getElementById("radarModal").style.display = "block";
-    initRainViewerDelayed();
+    // Delay ensures CSS has finished painting the display:block before library tries to render
+    setTimeout(initRainViewerDelayed, 200);
 }
 function closeRadarModal() { document.getElementById("radarModal").style.display = "none"; }
 
 function initRainViewerDelayed() {
+    // Polling logic: if library not loaded or container not ready, wait
     if (typeof RainViewerMap === 'undefined') {
         setTimeout(initRainViewerDelayed, 500);
         return;
     }
+    
+    // Safety check for map visibility
     if (!mapInstance && currentLat && currentLon) {
         document.getElementById("loadingMsg").style.display = "none";
         mapInstance = new RainViewerMap({
@@ -134,7 +138,6 @@ window.onload = function () {
     var u = new URL(window.location.href); u.searchParams.set("snow", e.target.checked ? "1" : "0"); window.location.href = u.href; 
   });
 
-  // RESTORED: Inline geocoding logic for better performance
   document.getElementById("autocomplete").onkeydown = (e) => {
     if (e.keyCode === 13) { 
         new google.maps.Geocoder().geocode({ address: document.getElementById("autocomplete").value }, (results, status) => {
