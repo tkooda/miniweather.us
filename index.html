@@ -36,16 +36,14 @@
 
 <script type="text/javascript">
 
-// utility functions to remove thunder / show snow on images..
+// utility functions to explicitly toggle thunder and snow bits
 String.prototype.replaceAt = function(index, replacement) {
-    return this.substr(0, index) + replacement+ this.substr(index + replacement.length);
+    return this.substr(0, index) + replacement + this.substr(index + replacement.length);
 }
-function hideThunder( s ) {
-  return s.replaceAt( 9, "0" );
-}
-function showSnow( s ) {
-  return s.replaceAt( 10, "1111" );
-}
+function hideThunder(s) { return s.replaceAt(9, "0"); }
+function showThunder(s) { return s.replaceAt(9, "1"); }
+function hideSnow(s)    { return s.replaceAt(10, "0000"); }
+function showSnow(s)    { return s.replaceAt(10, "1111"); }
 
 // redirect to "?zip=$zip" using latitude + longitude ..
 function redirect_to_zip_using_latlng( lat, lng ) {
@@ -60,6 +58,9 @@ function redirect_to_zip_using_latlng( lat, lng ) {
             if (results[0].address_components[i].types[j] === 'postal_code') {
               var zipCode = results[0].address_components[i].long_name;
               var url = new URL(window.location.href);
+              
+              // Only set zip. Drop thunder/snow params so the new location defaults to NWS data.
+              url.search = ""; 
               url.searchParams.set("zip", zipCode);
               window.location.href = url.href;
               return false; 
@@ -142,7 +143,6 @@ function manualGeolocate() {
 function safeBiasGeolocate() {
   if (navigator.geolocation && navigator.permissions) {
     navigator.permissions.query({name: 'geolocation'}).then(function(result) {
-      // Only request coordinates if permission is ALREADY granted
       if (result.state === 'granted') {
         navigator.geolocation.getCurrentPosition(function(position) {
           const geolocation = {
@@ -162,14 +162,10 @@ function safeBiasGeolocate() {
   }
 }
 
-// Checkbox event logic
+// Checkbox event logic now forces explicit "1" or "0"
 function toggleQueryParam(param, isChecked) {
   var url = new URL(window.location.href);
-  if (isChecked) {
-    url.searchParams.set(param, "1");
-  } else {
-    url.searchParams.delete(param);
-  }
+  url.searchParams.set(param, isChecked ? "1" : "0");
   window.location.href = url.href;
 }
 
@@ -180,11 +176,13 @@ var autocomplete; // global
 
 window.onload = function () {
   
-  // Set UI Checkbox states based on URL args
-  const thunderChecked = urlParamsBase.get("thunder") === "1";
-  const snowChecked = urlParamsBase.get("snow") === "1";
-  document.getElementById("chkThunder").checked = thunderChecked;
-  document.getElementById("chkSnow").checked = snowChecked;
+  // 1. Read URL overrides (returns null if user hasn't explicitly interacted yet)
+  const userThunder = urlParamsBase.get("thunder");
+  const userSnow = urlParamsBase.get("snow");
+
+  // Pre-check boxes ONLY if explicitly forced via URL before NWS data loads
+  if (userThunder !== null) document.getElementById("chkThunder").checked = (userThunder === "1");
+  if (userSnow !== null) document.getElementById("chkSnow").checked = (userSnow === "1");
 
   // Bind UI Checkbox change events
   document.getElementById("chkThunder").addEventListener('change', function() {
@@ -221,14 +219,21 @@ window.onload = function () {
                      
                      var pcmd = urlParamsImg.get("pcmd");
                      
-                     // Apply Thunder logic
-                     if (!thunderChecked) {
-                         pcmd = hideThunder(pcmd); // defaults to not checked / hidden
-                     }
-                     // Apply Snow logic
-                     if (snowChecked) {
-                         pcmd = showSnow(pcmd); // defaults to not checked / hidden
-                     }
+                     // 2. Determine native NWS defaults from the raw string
+                     var nwsThunder = pcmd.charAt(9) === '1';
+                     var nwsSnow = pcmd.substring(10, 14) !== '0000'; // Any non-zero here means snow/sleet is natively present
+                     
+                     // 3. Resolve final states: Explicit URL overrides take precedence, otherwise fallback to NWS
+                     var finalThunder = userThunder !== null ? (userThunder === "1") : nwsThunder;
+                     var finalSnow = userSnow !== null ? (userSnow === "1") : nwsSnow;
+                     
+                     // 4. Dynamically update UI checkboxes so the user sees the true state
+                     document.getElementById("chkThunder").checked = finalThunder;
+                     document.getElementById("chkSnow").checked = finalSnow;
+                     
+                     // 5. Apply final states to the pcmd string
+                     pcmd = finalThunder ? showThunder(pcmd) : hideThunder(pcmd);
+                     pcmd = finalSnow ? showSnow(pcmd) : hideSnow(pcmd);
                      
                      urlParamsImg.set("pcmd", pcmd);
 
