@@ -4,15 +4,10 @@
 <title>MiniWeather.US</title>
 <link rel="icon" href="data:;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAD////////////////////////////+/v///v3///79///+/f///v3///79/////v////////////////////////////////////////79///////z1LD/8tOt//LPpv/z0qz/89Sw//DImf/+/Pn///////////////////////////////////////7+/f//////+erY/+uuav/uuoH/7ruD/+23e//stHb/89Co///////9/Pv///////////////////////////////////7+///////43b7/+eTL//ngxf/54MT/+eTL//jdv/////////79//////////////////7+////////+vr5/8TCwv+5tbT/vL3B/7u8v/+7vMD/u7zA/7u8v/+8vcH/uLW0/9bV1f/////////////////+/v7//////8XFxf+9u7v/4uDe/93Z1//d2tj/3drY/93a2P/d2tj/3drY/9/c2/+vq6r/3dzc////////////7/n8//L////GvLj/3dbT//Dw8P/r6Of/7Orp/+zq6f/s6un/7Orp/+rp6P/z8vH/2NTT/8G/vv///////////9Hw/P9z1v7/vdzp/4eZo//j3dr/6uzr/+fl5P/p5uX/6efm/+jm5f/o5uX/6efm/7Swr//a2Nj////////////m+P7/7vf8/0LR//8SyN7/v62o//Hk4//s6en/6Ofm/+jm5f/n5eT/7+3s/8K/vv/Avr3///////7+/v////7/gNj7/7fl/P80yPv/APj//zvO0/+Orqz/r7Gu/+3q6f/s6+r/6ujn//Px8P+zsK//5+fn///////+/v7///////j9/v/S8fz/Z8/7/wDR/f8F9v7/AN3//1anxv/Cs67/3d3d/+Th4P+9ubj/vbu6///////+/v7////////////K7vz/e9b7/+35/P9q0Pv/Psr7/1nM/P/V9P//3dfV/7Wzs/+2s7P/y8nJ//z8/P///////////////////////f7///////9u0vr/1fL8/7Hl/P/j9v3/adD6//X8/////////v/////////+/v7////////////////////////////8/v//0/H9//3+//931fv/6vn+/9r0/f/0+/3///////7////+/f3////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////9/v////////7//////////f7/////////////////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==">
 
-<script src="https://rainviewer.com/integration/map.js" async></script>
-
 <style>
   .controls-container { display: inline-flex; align-items: center; gap: 8px; margin-left: 5px; }
   .gps-btn { background: none; border: none; cursor: pointer; padding: 2px 4px; display: flex; align-items: center; }
   .checkbox-label { font-family: sans-serif; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
-  .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: #fff; }
-  .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; cursor: pointer; z-index: 1001; }
-  #loadingMsg { display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; color: #555; }
 </style>
 </head>
 
@@ -30,36 +25,7 @@ function showThunder(s) { return s.replaceAt(9, "1"); }
 function hideSnow(s)    { return s.replaceAt(10, "0000"); }
 function showSnow(s)    { return s.replaceAt(10, "1111"); }
 
-let mapInstance = null;
 let currentLat = null, currentLon = null;
-
-// Modal Logic
-function openRadarModal() {
-    document.getElementById("radarModal").style.display = "block";
-    // Delay ensures CSS has finished painting the display:block before library tries to render
-    setTimeout(initRainViewerDelayed, 200);
-}
-function closeRadarModal() { document.getElementById("radarModal").style.display = "none"; }
-
-function initRainViewerDelayed() {
-    // Polling logic: if library not loaded or container not ready, wait
-    if (typeof RainViewerMap === 'undefined') {
-        setTimeout(initRainViewerDelayed, 500);
-        return;
-    }
-    
-    // Safety check for map visibility
-    if (!mapInstance && currentLat && currentLon) {
-        document.getElementById("loadingMsg").style.display = "none";
-        mapInstance = new RainViewerMap({
-            lat: currentLat,
-            lon: currentLon,
-            zoom: 8,
-            autoplay: true,
-            layers: ['radar'] 
-        });
-    }
-}
 
 // Location Helpers
 function fallbackToIPLocation() {
@@ -161,7 +127,7 @@ window.onload = function () {
 			document.getElementById("radarLinks").innerHTML =
 				`<a href="https://radar.weather.gov/?center=${currentLat},${currentLon}&zoom=8" target="_blank">NWS</a> | ` +
 				`<a href="https://www.windy.com/?radar,${currentLat},${currentLon},8" target="_blank">Windy</a> | ` +
-                `<button onclick="openRadarModal()">Radar Popup</button>`;
+				`<a href="https://www.rainviewer.com/weather-radar-map-live.html?lat=${currentLat}&lon=${currentLon}&zoom=8" target="_blank">RainViewer</a>`;
         }
         
         let cityName = urlParamsRedirected.get("CityName") || "";
@@ -226,12 +192,6 @@ window.onload = function () {
 <td align="right" id="radarLinks"></td>
 </tr>
 </table>
-
-<div id="radarModal" class="modal">
-    <span class="close-btn" onclick="closeRadarModal()">&times;</span>
-    <div id="loadingMsg">Loading Radar...</div>
-    <div id="rainviewer-map" style="width: 100vw; height: 100vh;"></div>
-</div>
 
 <img id="img1" src="" width="100%"><br/><br/><br/><br/>
 <img id="img2" src="" width="100%"><br/><br/><br/><br/>
