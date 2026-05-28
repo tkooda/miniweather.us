@@ -47,26 +47,39 @@ function showSnow(s)    { return s.replaceAt(10, "1111"); }
 
 // redirect to "?zip=$zip" using latitude + longitude ..
 function redirect_to_zip_using_latlng( lat, lng ) {
+  // Ensure the Google Maps library is fully loaded before executing
+  if (typeof google === 'undefined' || typeof google.maps === 'undefined' || typeof google.maps.Geocoder === 'undefined') {
+      console.warn("Maps API not ready yet. Retrying in 100ms...");
+      setTimeout(() => redirect_to_zip_using_latlng(lat, lng), 100);
+      return;
+  }
+
   const geocoder = new google.maps.Geocoder();
   const latlng = new google.maps.LatLng( lat, lng );
   
   geocoder.geocode( { 'location': latlng }, function(results, status) {
-    if ( status == "OK" ) {
-      if ( results[ 0 ] ) {
-        for (var i = 0; i < results[0].address_components.length; i++) {
-          for (var j = 0; j < results[0].address_components[i].types.length; j++) {
-            if (results[0].address_components[i].types[j] === 'postal_code') {
-              var zipCode = results[0].address_components[i].long_name;
-              var url = new URL(window.location.href);
-              
-              // Only set zip. Drop thunder/snow params so the new location defaults to NWS data.
-              url.search = ""; 
-              url.searchParams.set("zip", zipCode);
-              window.location.href = url.href;
-              return false; 
-            }
+    if ( status === "OK" ) {
+      let zipCode = null;
+      
+      // Look through ALL returned results to find the postal code
+      for (let i = 0; i < results.length; i++) {
+        for (let j = 0; j < results[i].address_components.length; j++) {
+          if (results[i].address_components[j].types.indexOf('postal_code') !== -1) {
+            zipCode = results[i].address_components[j].long_name;
+            break;
           }
         }
+        if (zipCode) break;
+      }
+
+      if (zipCode) {
+        var url = new URL(window.location.href);
+        // Only set zip. Drop thunder/snow params so the new location defaults to NWS data.
+        url.search = ""; 
+        url.searchParams.set("zip", zipCode);
+        window.location.href = url.href;
+      } else {
+        console.error('Geocode succeeded but no postal_code was found.');
       }
     } else {
       console.error('Geocode was not successful for the following reason: ' + status);
@@ -267,15 +280,13 @@ window.onload = function () {
 
   } else {
     // Attempt aggressive geolocation on root URL visit.
-    // This will trigger the browser's native permission popup on page load.
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         function(position) {
           redirect_to_zip_using_latlng(position.coords.latitude, position.coords.longitude);
         },
         function(error) {
-          // If the user denies the prompt or the browser auto-blocks it,
-          // fail silently and leave them on the homepage.
+          // Fail silently if denied or blocked
           console.warn("Auto-geolocation failed or was denied.");
         }
       );
