@@ -2,14 +2,36 @@
 <html>
 <head>
 <title>MiniWeather.US</title>
-<!-- <link rel="icon" href="data:;base64,iVBORw0KGgo="> -->
 <link rel="icon" href="data:;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAD////////////////////////////+/v///v3///79///+/f///v3///79/////v////////////////////////////////////////79///////z1LD/8tOt//LPpv/z0qz/89Sw//DImf/+/Pn///////////////////////////////////////7+/f//////+erY/+uuav/uuoH/7ruD/+23e//stHb/89Co///////9/Pv///////////////////////////////////7+///////43b7/+eTL//ngxf/54MT/+eTL//jdv/////////79//////////////////7+////////+vr5/8TCwv+5tbT/vL3B/7u8v/+7vMD/u7zA/7u8v/+8vcH/uLW0/9bV1f/////////////////+/v7//////8XFxf+9u7v/4uDe/93Z1//d2tj/3drY/93a2P/d2tj/3drY/9/c2/+vq6r/3dzc////////////7/n8//L////GvLj/3dbT//Dw8P/r6Of/7Orp/+zq6f/s6un/7Orp/+rp6P/z8vH/2NTT/8G/vv///////////9Hw/P9z1v7/vdzp/4eZo//j3dr/6uzr/+fl5P/p5uX/6efm/+jm5f/o5uX/6efm/7Swr//a2Nj////////////m+P7/7vf8/0LR//8SyN7/v62o//Hk4//s6en/6Ofm/+jm5f/n5eT/7+3s/8K/vv/Avr3///////7+/v////7/gNj7/7fl/P80yPv/APj//zvO0/+Orqz/r7Gu/+3q6f/s6+r/6ujn//Px8P+zsK//5+fn///////+/v7///////j9/v/S8fz/Z8/7/wDR/f8F9v7/AN3//1anxv/Cs67/3d3d/+Th4P+9ubj/vbu6///////+/v7////////////K7vz/e9b7/+35/P9q0Pv/Psr7/1nM/P/V9P//3dfV/7Wzs/+2s7P/y8nJ//z8/P///////////////////////f7///////9u0vr/1fL8/7Hl/P/j9v3/adD6//X8/////////v/////////+/v7////////////////////////////8/v//0/H9//3+//931fv/6vn+/9r0/f/0+/3///////7////+/f3////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////9/v////////7//////////f7/////////////////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==">
+<style>
+  .controls-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 5px;
+  }
+  .gps-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    display: flex;
+    align-items: center;
+  }
+  .checkbox-label {
+    font-family: sans-serif;
+    font-size: 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+</style>
 </head>
 
 <body>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
-
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCILANmgIcwkai7OlOpUj03Jhp5yRXV48A&libraries=geocoding,places&loading=async&callback=initAutocomplete" async defer></script>
 
 <script type="text/javascript">
@@ -25,7 +47,6 @@ function showSnow( s ) {
   return s.replaceAt( 10, "1111" );
 }
 
-
 // redirect to "?zip=$zip" using latitude + longitude ..
 function redirect_to_zip_using_latlng( lat, lng ) {
   const geocoder = new google.maps.Geocoder();
@@ -34,13 +55,14 @@ function redirect_to_zip_using_latlng( lat, lng ) {
   geocoder.geocode( { 'location': latlng }, function(results, status) {
     if ( status == "OK" ) {
       if ( results[ 0 ] ) {
-        // search results for zip code..
         for (var i = 0; i < results[0].address_components.length; i++) {
           for (var j = 0; j < results[0].address_components[i].types.length; j++) {
             if (results[0].address_components[i].types[j] === 'postal_code') {
               var zipCode = results[0].address_components[i].long_name;
-              window.location.href = window.location.pathname + "?zip=" + zipCode.toString();
-              return false; // indicate handled
+              var url = new URL(window.location.href);
+              url.searchParams.set("zip", zipCode);
+              window.location.href = url.href;
+              return false; 
             }
           }
         }
@@ -50,7 +72,6 @@ function redirect_to_zip_using_latlng( lat, lng ) {
     }
   });
 }
-
 
 // redirect to /zip/$zip using (e.g.) "city, state, country" ..
 function redirect_to_zip_using_address( address ) {
@@ -67,21 +88,15 @@ function redirect_to_zip_using_address( address ) {
       console.error('Geocode was not successful for the following reason: ' + status);
     }
   });
-
 }
-
 
 function initAutocomplete() {
-  // use Google Places API to provide autocomplete..  (using old "google.maps.places.Autocomplete" method (vs new "google.maps.places.PlaceAutocompleteElement" method that looks weird)
   autocomplete = new google.maps.places.Autocomplete(
- /** @type {!HTMLInputElement} */(document.getElementById('autocomplete')),
-      {types: ['geocode']
-  });
-  
-  // When the user selects an address from the dropdown, populate the address fields in the form.
+    /** @type {!HTMLInputElement} */(document.getElementById('autocomplete')),
+    {types: ['geocode']}
+  );
   autocomplete.addListener('place_changed', processAddress);
 }
-
 
 function processAddress() {
   const componentForm = {
@@ -93,7 +108,6 @@ function processAddress() {
     postal_code: 'short_name'
   };
   
-  // Get the place details from the autocomplete object.
   var place = autocomplete.getPlace();
   if ( ! place.address_components ) return;
   
@@ -104,7 +118,6 @@ function processAddress() {
     var addressType = place.address_components[i].types[0];
     if (componentForm[addressType]) {
       var val = place.address_components[i][componentForm[addressType]];
-//      console.log( addressType + " : " + val );
       if ( addressType == 'locality' ) {
         city = val;
       } else if ( addressType == 'administrative_area_level_1' ) {
@@ -114,38 +127,73 @@ function processAddress() {
       }
     }
   }
-  
   redirect_to_zip_using_address( city + ", " + state + ", " + country );
 }
 
-
-function biasGeolocate() {
-  // attempt to bias the autocomplete object to the user's geographical location, as supplied by the browser's 'navigator.geolocation' object.
+function manualGeolocate() {
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(function(position) {
-      const geolocation = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude
-      };
-      const circle = new google.maps.Circle({
-        center: geolocation,
-        radius: position.coords.accuracy
-      });
-      autocomplete.setBounds(circle.getBounds());
+      redirect_to_zip_using_latlng( position.coords.latitude, position.coords.longitude );
     });
   }
 }
 
+// Safely biases the Google Maps Autocomplete without triggering permission prompts
+function safeBiasGeolocate() {
+  if (navigator.geolocation && navigator.permissions) {
+    navigator.permissions.query({name: 'geolocation'}).then(function(result) {
+      // Only request coordinates if permission is ALREADY granted
+      if (result.state === 'granted') {
+        navigator.geolocation.getCurrentPosition(function(position) {
+          const geolocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          if (autocomplete) {
+            const circle = new google.maps.Circle({
+              center: geolocation,
+              radius: position.coords.accuracy
+            });
+            autocomplete.setBounds(circle.getBounds());
+          }
+        });
+      }
+    });
+  }
+}
+
+// Checkbox event logic
+function toggleQueryParam(param, isChecked) {
+  var url = new URL(window.location.href);
+  if (isChecked) {
+    url.searchParams.set(param, "1");
+  } else {
+    url.searchParams.delete(param);
+  }
+  window.location.href = url.href;
+}
 
 // main()..
 const URL_BASE = "https://forecast.weather.gov/";
 const urlParamsBase = new URLSearchParams( window.location.search );
-
 var autocomplete; // global
 
-window.onload = function () { // wait for Google Maps libraries to become available before using them
+window.onload = function () {
   
-  // detect carriage return in input field.. -> redirect to "?zip=$zip" ..
+  // Set UI Checkbox states based on URL args
+  const thunderChecked = urlParamsBase.get("thunder") === "1";
+  const snowChecked = urlParamsBase.get("snow") === "1";
+  document.getElementById("chkThunder").checked = thunderChecked;
+  document.getElementById("chkSnow").checked = snowChecked;
+
+  // Bind UI Checkbox change events
+  document.getElementById("chkThunder").addEventListener('change', function() {
+    toggleQueryParam("thunder", this.checked);
+  });
+  document.getElementById("chkSnow").addEventListener('change', function() {
+    toggleQueryParam("snow", this.checked);
+  });
+
   document.getElementById("autocomplete").onkeydown = function (e) {
     if ( e.keyCode === 13 ) {
       redirect_to_zip_using_address( document.getElementById("autocomplete").value );
@@ -153,62 +201,74 @@ window.onload = function () { // wait for Google Maps libraries to become availa
     }
   }
   
-  // process zip query arg ..
   if ( urlParamsBase.has("zip") ) {
-    
-    var xhr = new XMLHttpRequest(); // for obtaining responseURL in jQuery success()
-    
+    var xhr = new XMLHttpRequest(); 
     $.ajax( { url: URL_BASE + "zipcity.php",
               type: "POST",
               data: { inputstring: urlParamsBase.get("zip") },
-              xhr: function() {
-                return xhr;
-              },
+              xhr: function() { return xhr; },
               success: function( dataCity ) {
                 pathForecast = $( dataCity ).find( "img[src='newimages/medium/hourlyweather.png']" ).closest("a").attr("href");
-//                console.log( "pathForecast: " + pathForecast );
-//                console.log( "responseURL: " + xhr.responseURL );
                 var urlParamsRedirected = new URLSearchParams( xhr.responseURL.split("?")[1] );
-//                console.log( "CityName: " + urlParamsRedirected.get( "CityName" ) );
-//                console.log( "state: " + urlParamsRedirected.get( "state" ) );
-//                console.log( "lat: " + urlParamsRedirected.get( "lat" ) );
-//                console.log( "lon: " + urlParamsRedirected.get( "lon" ) );
+                
                 $("#radar").html( "<a href='https://www.weatherbug.com/maps/?layerId=Radar.Global&center=" + urlParamsRedirected.get( "lat" ) + "," + urlParamsRedirected.get( "lon" ) + "'>Live Radar</a>" );
                 $("#citystatezip").html( urlParamsRedirected.get( "CityName" ) + ", " + urlParamsRedirected.get( "state" ) + " (" + urlParamsBase.get("zip") + ") : " );
-                $.get( URL_BASE + pathForecast,
-                       function( dataForecast ) {
-                         path_img_orig = $( dataForecast ).find( "img[src*='meteograms/Plotter.php']" ).attr("src");
-//                         console.log( "path_img_orig: " + path_img_orig );
-                         path_img_array =  path_img_orig.split('?') // split route path from query strings
-                         var urlParamsImg = new URLSearchParams( path_img_array[1] );
-//                         urlParamsImg.set( "pcmd", hideThunder( urlParamsImg.get( "pcmd" ) ) );
-//                         urlParamsImg.set( "pcmd", showSnow( urlParamsImg.get( "pcmd" ) ) );
-                         $("#img1").attr( "src", URL_BASE + path_img_array[0] + "?" + urlParamsImg.toString() );
-                         urlParamsImg.set( "ahour", "48" );
-                         $("#img2").attr( "src", URL_BASE + path_img_array[0] + "?" + urlParamsImg.toString() );
-                         urlParamsImg.set( "ahour", "96" );
-                         $("#img3").attr( "src", URL_BASE + path_img_array[0] + "?" + urlParamsImg.toString() );
-                     });
-                }
+                
+                $.get( URL_BASE + pathForecast, function( dataForecast ) {
+                     path_img_orig = $( dataForecast ).find( "img[src*='meteograms/Plotter.php']" ).attr("src");
+                     path_img_array = path_img_orig.split('?');
+                     var urlParamsImg = new URLSearchParams( path_img_array[1] );
+                     
+                     var pcmd = urlParamsImg.get("pcmd");
+                     
+                     // Apply Thunder logic
+                     if (!thunderChecked) {
+                         pcmd = hideThunder(pcmd); // defaults to not checked / hidden
+                     }
+                     // Apply Snow logic
+                     if (snowChecked) {
+                         pcmd = showSnow(pcmd); // defaults to not checked / hidden
+                     }
+                     
+                     urlParamsImg.set("pcmd", pcmd);
+
+                     $("#img1").attr( "src", URL_BASE + path_img_array[0] + "?" + urlParamsImg.toString() );
+                     urlParamsImg.set( "ahour", "48" );
+                     $("#img2").attr( "src", URL_BASE + path_img_array[0] + "?" + urlParamsImg.toString() );
+                     urlParamsImg.set( "ahour", "96" );
+                     $("#img3").attr( "src", URL_BASE + path_img_array[0] + "?" + urlParamsImg.toString() );
+                 });
+              }
             });
 
   } else {
-    // attempt to get lat+lon from browser geolocation, fetch likely zip, and attempt to redir to ?zip=* from homepage (presume most visitors want to know about local weather) ..
+    // Attempt background geolocation on the homepage if permitted
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(function(position) {
             redirect_to_zip_using_latlng( position.coords.latitude, position.coords.longitude );
         });
     }
   }
-
 }
 </script>
 
 <table width="100%">
 <tr>
-<td><a href="/">MiniWeather.US</a> :
-<span id="citystatezip"></span>
-<input id="autocomplete" placeholder="Enter a city or zipcode" onclick="biasGeolocate()" type="text"></input></td>
+<td>
+  <a href="/">MiniWeather.US</a> :
+  <span id="citystatezip"></span>
+  <input id="autocomplete" placeholder="Enter a city or zipcode" type="text" style="width:160px;" onfocus="safeBiasGeolocate()"></input>
+  
+  <div class="controls-container">
+    <button type="button" class="gps-btn" onclick="manualGeolocate()" title="Use Current Location">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="#444">
+        <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+      </svg>
+    </button>
+    <label class="checkbox-label"><input type="checkbox" id="chkThunder"> Show Thunder</label>
+    <label class="checkbox-label"><input type="checkbox" id="chkSnow"> Show Snow</label>
+  </div>
+</td>
 <td align="right" id="radar"></td>
 </tr>
 </table>
@@ -218,5 +278,4 @@ window.onload = function () { // wait for Google Maps libraries to become availa
 <img id="img3" src="" width="100%"><br/><br/><br/><br/>
 
 </body>
-
 </html>
