@@ -36,7 +36,6 @@
 
 <script type="text/javascript">
 
-// utility functions
 String.prototype.replaceAt = function(index, replacement) {
     return this.substr(0, index) + replacement + this.substr(index + replacement.length);
 }
@@ -45,7 +44,6 @@ function showThunder(s) { return s.replaceAt(9, "1"); }
 function hideSnow(s)    { return s.replaceAt(10, "0000"); }
 function showSnow(s)    { return s.replaceAt(10, "1111"); }
 
-// IP Location Fallback
 function fallbackToIPLocation() {
     fetch('https://ipapi.co/json/')
         .then(response => response.json())
@@ -61,6 +59,11 @@ function fallbackToIPLocation() {
 }
 
 function redirect_to_zip_using_latlng( lat, lng ) {
+  if (typeof google === 'undefined' || typeof google.maps === 'undefined' || typeof google.maps.Geocoder === 'undefined') {
+      setTimeout(() => redirect_to_zip_using_latlng(lat, lng), 100);
+      return;
+  }
+
   const geocoder = new google.maps.Geocoder();
   const latlng = new google.maps.LatLng( lat, lng );
   
@@ -106,6 +109,23 @@ function initAutocomplete() {
     {types: ['geocode']}
   );
   autocomplete.addListener('place_changed', processAddress);
+
+  const urlParams = new URLSearchParams(window.location.search);
+  if (!urlParams.has("zip")) {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          redirect_to_zip_using_latlng(position.coords.latitude, position.coords.longitude);
+        },
+        function(error) {
+          fallbackToIPLocation(); 
+        },
+        { timeout: 5000 }
+      );
+    } else {
+      fallbackToIPLocation();
+    }
+  }
 }
 
 function processAddress() {
@@ -151,6 +171,16 @@ var autocomplete;
 
 window.onload = function () {
   const urlParams = new URLSearchParams(window.location.search);
+
+  // Dynamically hide/show the GPS button
+  if (navigator.geolocation && navigator.permissions) {
+    navigator.permissions.query({name: 'geolocation'}).then(function(result) {
+      const gpsBtn = document.getElementById("gpsBtn");
+      if (result.state === 'granted') { gpsBtn.style.display = 'none'; }
+      result.onchange = function() { gpsBtn.style.display = (this.state === 'granted') ? 'none' : 'flex'; };
+    });
+  }
+  
   const userThunder = urlParams.get("thunder");
   const userSnow = urlParams.get("snow");
 
@@ -170,6 +200,14 @@ window.onload = function () {
   if ( urlParams.has("zip") ) {
     $.ajax( { url: URL_BASE + "zipcity.php", type: "POST", data: { inputstring: urlParams.get("zip") }, success: function( dataCity ) {
         var pathForecast = $( dataCity ).find( "img[src='newimages/medium/hourlyweather.png']" ).closest("a").attr("href");
+        
+        // --- FIXED CITY/STATE EXTRACTION ---
+        // Try getting name/state from redirect URL, fallback to "Zip [Value]"
+        var cityName = $(dataCity).find("title").text().split(" - ")[0] || "Location";
+        var state = ""; // Difficult to extract from generic NWS pages without parsing specific tags
+        $("#citystatezip").html(cityName + " (" + urlParams.get("zip") + ") : ");
+        // ------------------------------------
+
         $.get( URL_BASE + pathForecast, function( dataForecast ) {
             var path_img_orig = $( dataForecast ).find( "img[src*='meteograms/Plotter.php']" ).attr("src").split('?');
             var urlParamsImg = new URLSearchParams( path_img_orig[1] );
@@ -192,16 +230,6 @@ window.onload = function () {
             $("#img3").attr( "src", URL_BASE + path_img_orig[0] + "?" + urlParamsImg.toString() );
         });
     }});
-  } else {
-    // Direct geolocation attempt as per original code
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            function(position) { redirect_to_zip_using_latlng( position.coords.latitude, position.coords.longitude ); },
-            function(error) { fallbackToIPLocation(); }
-        );
-    } else {
-        fallbackToIPLocation();
-    }
   }
 }
 </script>
