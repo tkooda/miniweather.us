@@ -124,10 +124,12 @@ window.onload = function () {
   const chkRain = document.getElementById("chkRain");
   const chkAtmosphere = document.getElementById("chkAtmosphere");
 
+  // Force unchecked unless specified in URL
   chkThunder.checked = (urlParams.get("thunder") === "1");
-  chkSnow.checked = (urlParams.get("snow") === "1");
-  chkRain.checked = (urlParams.get("rain") === "1");
   chkAtmosphere.checked = (urlParams.get("atmo") === "1");
+  // Snow and Rain can default to their NWS state if user hasn't specified
+  chkSnow.checked = (urlParams.has("snow") ? urlParams.get("snow") === "1" : true);
+  chkRain.checked = (urlParams.has("rain") ? urlParams.get("rain") === "1" : true);
 
   [chkThunder, chkSnow, chkRain, chkAtmosphere].forEach(el => {
       el.addEventListener('change', (e) => {
@@ -188,11 +190,11 @@ window.onload = function () {
         const params = new URLSearchParams(query);
         const pcmd = params.get("pcmd");
         
-        // Logical check: Use URL params, fallback to pcmd bit check
-        chkThunder.checked = (urlParams.get("thunder") === "1") || (!urlParams.has("thunder") && pcmd.charAt(9) === '1');
-        chkSnow.checked = (urlParams.get("snow") === "1") || (!urlParams.has("snow") && pcmd.charAt(10) === '1');
-        chkRain.checked = (urlParams.get("rain") === "1") || (!urlParams.has("rain") && pcmd.charAt(8) === '1');
-        chkAtmosphere.checked = (urlParams.get("atmo") === "1") || (!urlParams.has("atmo") && pcmd.substring(5, 8) === '111');
+        // Re-calculate checks based on user spec vs NWS defaults
+        chkThunder.checked = (urlParams.get("thunder") === "1");
+        chkSnow.checked = (urlParams.has("snow") ? urlParams.get("snow") === "1" : (pcmd.charAt(10) === '1'));
+        chkRain.checked = (urlParams.has("rain") ? urlParams.get("rain") === "1" : (pcmd.charAt(8) === '1'));
+        chkAtmosphere.checked = (urlParams.get("atmo") === "1");
         
         let newPcmd = pcmd;
         newPcmd = chkThunder.checked ? showThunder(newPcmd) : hideThunder(newPcmd);
