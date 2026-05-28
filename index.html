@@ -162,7 +162,7 @@ function safeBiasGeolocate() {
   }
 }
 
-// Checkbox event logic now forces explicit "1" or "0"
+// Checkbox event logic forces explicit "1" or "0"
 function toggleQueryParam(param, isChecked) {
   var url = new URL(window.location.href);
   url.searchParams.set(param, isChecked ? "1" : "0");
@@ -195,7 +195,7 @@ window.onload = function () {
     });
   }
   
-  // 1. Read URL overrides (returns null if user hasn't explicitly interacted yet)
+  // Read URL overrides (returns null if user hasn't explicitly interacted yet)
   const userThunder = urlParamsBase.get("thunder");
   const userSnow = urlParamsBase.get("snow");
 
@@ -238,19 +238,19 @@ window.onload = function () {
                      
                      var pcmd = urlParamsImg.get("pcmd");
                      
-                     // 2. Determine native NWS defaults from the raw string
+                     // Determine native NWS defaults from the raw string
                      var nwsThunder = pcmd.charAt(9) === '1';
                      var nwsSnow = pcmd.substring(10, 14) !== '0000'; // Any non-zero here means snow/sleet is natively present
                      
-                     // 3. Resolve final states: Explicit URL overrides take precedence, otherwise fallback to NWS
+                     // Resolve final states: Explicit URL overrides take precedence, otherwise fallback to NWS
                      var finalThunder = userThunder !== null ? (userThunder === "1") : nwsThunder;
                      var finalSnow = userSnow !== null ? (userSnow === "1") : nwsSnow;
                      
-                     // 4. Dynamically update UI checkboxes so the user sees the true state
+                     // Dynamically update UI checkboxes so the user sees the true state
                      document.getElementById("chkThunder").checked = finalThunder;
                      document.getElementById("chkSnow").checked = finalSnow;
                      
-                     // 5. Apply final states to the pcmd string
+                     // Apply final states to the pcmd string
                      pcmd = finalThunder ? showThunder(pcmd) : hideThunder(pcmd);
                      pcmd = finalSnow ? showSnow(pcmd) : hideSnow(pcmd);
                      
@@ -266,11 +266,19 @@ window.onload = function () {
             });
 
   } else {
-    // Attempt background geolocation on the homepage if permitted
+    // Attempt aggressive geolocation on root URL visit.
+    // This will trigger the browser's native permission popup on page load.
     if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(function(position) {
-            redirect_to_zip_using_latlng( position.coords.latitude, position.coords.longitude );
-        });
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          redirect_to_zip_using_latlng(position.coords.latitude, position.coords.longitude);
+        },
+        function(error) {
+          // If the user denies the prompt or the browser auto-blocks it,
+          // fail silently and leave them on the homepage.
+          console.warn("Auto-geolocation failed or was denied.");
+        }
+      );
     }
   }
 }
