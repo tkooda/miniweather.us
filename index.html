@@ -6,27 +6,21 @@
 <link rel="icon" href="data:;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAD////////////////////////////+/v///v3///79///+/f///v3///79/////v////////////////////////////////////////79///////z1LD/8tOt//LPpv/z0qz/89Sw//DImf/+/Pn///////////////////////////////////////7+/f//////+erY/+uuav/uuoH/7ruD/+23e//stHb/89Co///////9/Pv///////////////////////////////////7+///////43b7/+eTL//ngxf/54MT/+eTL//jdv/////////79//////////////////7+////////+vr5/8TCwv+5tbT/vL3B/7u8v/+7vMD/u7zA/7u8v/+8vcH/uLW0/9bV1f/////////////////+/v7//////8XFxf+9u7v/4uDe/93Z1//d2tj/3drY/93a2P/d2tj/3drY/9/c2/+vq6r/3dzc////////////7/n8//L////GvLj/3dbT//Dw8P/r6Of/7Orp/+zq6f/s6un/7Orp/+rp6P/z8vH/2NTT/8G/vv///////////9Hw/P9z1v7/vdzp/4eZo//j3dr/6uzr/+fl5P/p5uX/6efm/+jm5f/o5uX/6efm/7Swr//a2Nj////////////m+P7/7vf8/0LR//8SyN7/v62o//Hk4//s6en/6Ofm/+jm5f/n5eT/7+3s/8K/vv/Avr3///////7+/v////7/gNj7/7fl/P80yPv/APj//zvO0/+Orqz/r7Gu/+3q6f/s6+r/6ujn//Px8P+zsK//5+fn///////+/v7///////j9/v/S8fz/Z8/7/wDR/f8F9v7/AN3//1anxv/Cs67/3d3d/+Th4P+9ubj/vbu6///////+/v7////////////K7vz/e9b7/+35/P9q0Pv/Psr7/1nM/P/V9P//3dfV/7Wzs/+2s7P/y8nJ//z8/P///////////////////////f7///////9u0vr/1fL8/7Hl/P/j9v3/adD6//X8/////////v/////////+/v7////////////////////////////8/v//0/H9//3+//931fv/6vn+/9r0/f/0+/3///////7////+/f3////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////9/v////////7//////////f7/////////////////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==">
 
 <style>
-  html, body { height: 100%; margin: 0; }
-  body { display: flex; flex-direction: column; }
-  
-  table { flex: 0 0 auto; }
-  
   .controls-container { display: inline-flex; align-items: center; gap: 8px; margin-left: 5px; }
   .gps-btn { background: none; border: none; cursor: pointer; padding: 2px 4px; display: flex; align-items: center; }
   .checkbox-label { font-family: sans-serif; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
   
-  /* Mobile: Flexbox keeps header and images visible */
+  /* Mobile: Horizontal scroll, images constrained to viewport height but zoomable */
   @media (max-width: 767px) {
     .weather-images {
       display: flex;
-      flex: 1;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
-      min-height: 0;
+      gap: 0;
     }
     .weather-images img {
       flex: 0 0 auto;
-      height: 100%;
+      max-height: 85vh; /* Allows room for header/UI and enables pinch-out */
       width: auto;
       object-fit: contain;
       display: block;
@@ -38,7 +32,6 @@
     .weather-images {
       display: block;
       overflow-x: visible;
-      height: auto;
     }
     .weather-images img {
       width: 100%;
