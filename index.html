@@ -193,7 +193,7 @@ window.onload = function () {
         const pcmd = params.get("pcmd");
         
         let newPcmd = hideHeatIndex(pcmd);
-        hideThunder(newPcmd);
+        newPcmd = hideThunder(newPcmd);
         
         // Logical check: Use URL params, fallback to pcmd bit check for Snow/Rain only
         // Atmo remains forced by checkbox state (ignoring original bits)
