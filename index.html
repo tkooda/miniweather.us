@@ -36,7 +36,7 @@
 
 <script type="text/javascript">
 
-// utility functions to explicitly toggle thunder and snow bits
+// utility functions
 String.prototype.replaceAt = function(index, replacement) {
     return this.substr(0, index) + replacement + this.substr(index + replacement.length);
 }
@@ -45,9 +45,8 @@ function showThunder(s) { return s.replaceAt(9, "1"); }
 function hideSnow(s)    { return s.replaceAt(10, "0000"); }
 function showSnow(s)    { return s.replaceAt(10, "1111"); }
 
-// IP Location Fallback for strict privacy browsers
+// IP Location Fallback
 function fallbackToIPLocation() {
-    console.log("Native Geolocation failed/blocked. Attempting IP fallback...");
     fetch('https://ipapi.co/json/')
         .then(response => response.json())
         .then(data => {
@@ -56,20 +55,12 @@ function fallbackToIPLocation() {
                 url.search = ""; 
                 url.searchParams.set("zip", data.postal);
                 window.location.href = url.href;
-            } else {
-                console.warn("IP Fallback failed to find a postal code.");
             }
         })
-        .catch(err => console.error("IP Fallback network error:", err));
+        .catch(err => console.error("IP Fallback failed."));
 }
 
-// redirect to "?zip=$zip" using latitude + longitude ..
 function redirect_to_zip_using_latlng( lat, lng ) {
-  if (typeof google === 'undefined' || typeof google.maps === 'undefined' || typeof google.maps.Geocoder === 'undefined') {
-      setTimeout(() => redirect_to_zip_using_latlng(lat, lng), 100);
-      return;
-  }
-
   const geocoder = new google.maps.Geocoder();
   const latlng = new google.maps.LatLng( lat, lng );
   
@@ -102,88 +93,33 @@ function redirect_to_zip_using_latlng( lat, lng ) {
 
 function redirect_to_zip_using_address( address ) {
   const geocoder = new google.maps.Geocoder();
-  const request = {
-    address: address,
-    region: 'us'
-  };
-  
-  geocoder.geocode( request, ( results, status ) => {
+  geocoder.geocode({ address: address, region: 'us' }, ( results, status ) => {
     if ( status === 'OK' ) {
-      redirect_to_zip_using_latlng( results[ 0 ].geometry.location.lat(), results[ 0 ].geometry.location.lng() );
-    } else {
-      console.error('Geocode was not successful for the following reason: ' + status);
+      redirect_to_zip_using_latlng( results[0].geometry.location.lat(), results[0].geometry.location.lng() );
     }
   });
 }
 
 function initAutocomplete() {
   autocomplete = new google.maps.places.Autocomplete(
-    /** @type {!HTMLInputElement} */(document.getElementById('autocomplete')),
+    document.getElementById('autocomplete'),
     {types: ['geocode']}
   );
   autocomplete.addListener('place_changed', processAddress);
-
-  // Auto-Geolocation Trigger on root visits
-  const urlParams = new URLSearchParams(window.location.search);
-  if (!urlParams.has("zip")) {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        function(position) {
-          redirect_to_zip_using_latlng(position.coords.latitude, position.coords.longitude);
-        },
-        function(error) {
-          fallbackToIPLocation(); 
-        },
-        { timeout: 5000 }
-      );
-    } else {
-      fallbackToIPLocation();
-    }
-  }
 }
 
 function processAddress() {
-  const componentForm = {
-    street_number: 'short_name',
-    route: 'long_name',
-    locality: 'long_name',
-    administrative_area_level_1: 'short_name',
-    country: 'long_name',
-    postal_code: 'short_name'
-  };
-  
   var place = autocomplete.getPlace();
-  if ( ! place.address_components ) return;
-  
-  var city = "";
-  var state = "";
-  var country = "";
-  for (var i = 0; i < place.address_components.length; i++) {
-    var addressType = place.address_components[i].types[0];
-    if (componentForm[addressType]) {
-      var val = place.address_components[i][componentForm[addressType]];
-      if ( addressType == 'locality' ) {
-        city = val;
-      } else if ( addressType == 'administrative_area_level_1' ) {
-        state = val
-      } else if ( addressType == 'country' ) {
-        country = val
-      }
-    }
+  if (place.address_components) {
+      redirect_to_zip_using_address(place.formatted_address);
   }
-  redirect_to_zip_using_address( city + ", " + state + ", " + country );
 }
 
 function manualGeolocate() {
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
-      function(position) {
-        redirect_to_zip_using_latlng( position.coords.latitude, position.coords.longitude );
-      },
-      function(error) {
-        fallbackToIPLocation();
-      },
-      { timeout: 5000 }
+        function(position) { redirect_to_zip_using_latlng( position.coords.latitude, position.coords.longitude ); },
+        function(error) { fallbackToIPLocation(); }
     );
   } else {
     fallbackToIPLocation();
@@ -191,22 +127,14 @@ function manualGeolocate() {
 }
 
 function safeBiasGeolocate() {
-  if (navigator.geolocation && navigator.permissions) {
-    navigator.permissions.query({name: 'geolocation'}).then(function(result) {
-      if (result.state === 'granted') {
-        navigator.geolocation.getCurrentPosition(function(position) {
-          const geolocation = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          };
-          if (autocomplete) {
-            const circle = new google.maps.Circle({
-              center: geolocation,
-              radius: position.coords.accuracy
-            });
-            autocomplete.setBounds(circle.getBounds());
-          }
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(position) {
+      if (autocomplete) {
+        const circle = new google.maps.Circle({
+          center: {lat: position.coords.latitude, lng: position.coords.longitude},
+          radius: position.coords.accuracy
         });
+        autocomplete.setBounds(circle.getBounds());
       }
     });
   }
@@ -219,42 +147,18 @@ function toggleQueryParam(param, isChecked) {
 }
 
 const URL_BASE = "https://forecast.weather.gov/";
-const urlParamsBase = new URLSearchParams( window.location.search );
-var autocomplete; 
+var autocomplete;
 
 window.onload = function () {
-
-  // Dynamically hide/show the GPS button based on permission state
-  if (navigator.geolocation && navigator.permissions) {
-    navigator.permissions.query({name: 'geolocation'}).then(function(result) {
-      const gpsBtn = document.getElementById("gpsBtn");
-      
-      if (result.state === 'granted') {
-        gpsBtn.style.display = 'none';
-      }
-
-      result.onchange = function() {
-        if (this.state === 'granted') {
-          gpsBtn.style.display = 'none';
-        } else {
-          gpsBtn.style.display = 'flex';
-        }
-      };
-    });
-  }
-  
-  const userThunder = urlParamsBase.get("thunder");
-  const userSnow = urlParamsBase.get("snow");
+  const urlParams = new URLSearchParams(window.location.search);
+  const userThunder = urlParams.get("thunder");
+  const userSnow = urlParams.get("snow");
 
   if (userThunder !== null) document.getElementById("chkThunder").checked = (userThunder === "1");
   if (userSnow !== null) document.getElementById("chkSnow").checked = (userSnow === "1");
 
-  document.getElementById("chkThunder").addEventListener('change', function() {
-    toggleQueryParam("thunder", this.checked);
-  });
-  document.getElementById("chkSnow").addEventListener('change', function() {
-    toggleQueryParam("snow", this.checked);
-  });
+  document.getElementById("chkThunder").addEventListener('change', function() { toggleQueryParam("thunder", this.checked); });
+  document.getElementById("chkSnow").addEventListener('change', function() { toggleQueryParam("snow", this.checked); });
 
   document.getElementById("autocomplete").onkeydown = function (e) {
     if ( e.keyCode === 13 ) {
@@ -263,48 +167,41 @@ window.onload = function () {
     }
   }
   
-  if ( urlParamsBase.has("zip") ) {
-    var xhr = new XMLHttpRequest(); 
-    $.ajax( { url: URL_BASE + "zipcity.php",
-              type: "POST",
-              data: { inputstring: urlParamsBase.get("zip") },
-              xhr: function() { return xhr; },
-              success: function( dataCity ) {
-                pathForecast = $( dataCity ).find( "img[src='newimages/medium/hourlyweather.png']" ).closest("a").attr("href");
-                var urlParamsRedirected = new URLSearchParams( xhr.responseURL.split("?")[1] );
-                
-                $("#radar").html( "<a href='https://www.weatherbug.com/maps/?layerId=Radar.Global&center=" + urlParamsRedirected.get( "lat" ) + "," + urlParamsRedirected.get( "lon" ) + "'>Live Radar</a>" );
-                $("#citystatezip").html( urlParamsRedirected.get( "CityName" ) + ", " + urlParamsRedirected.get( "state" ) + " (" + urlParamsBase.get("zip") + ") : " );
-                
-                $.get( URL_BASE + pathForecast, function( dataForecast ) {
-                     path_img_orig = $( dataForecast ).find( "img[src*='meteograms/Plotter.php']" ).attr("src");
-                     path_img_array = path_img_orig.split('?');
-                     var urlParamsImg = new URLSearchParams( path_img_array[1] );
-                     
-                     var pcmd = urlParamsImg.get("pcmd");
-                     
-                     var nwsThunder = pcmd.charAt(9) === '1';
-                     var nwsSnow = pcmd.substring(10, 14) !== '0000'; 
-                     
-                     var finalThunder = userThunder !== null ? (userThunder === "1") : nwsThunder;
-                     var finalSnow = userSnow !== null ? (userSnow === "1") : nwsSnow;
-                     
-                     document.getElementById("chkThunder").checked = finalThunder;
-                     document.getElementById("chkSnow").checked = finalSnow;
-                     
-                     pcmd = finalThunder ? showThunder(pcmd) : hideThunder(pcmd);
-                     pcmd = finalSnow ? showSnow(pcmd) : hideSnow(pcmd);
-                     
-                     urlParamsImg.set("pcmd", pcmd);
+  if ( urlParams.has("zip") ) {
+    $.ajax( { url: URL_BASE + "zipcity.php", type: "POST", data: { inputstring: urlParams.get("zip") }, success: function( dataCity ) {
+        var pathForecast = $( dataCity ).find( "img[src='newimages/medium/hourlyweather.png']" ).closest("a").attr("href");
+        $.get( URL_BASE + pathForecast, function( dataForecast ) {
+            var path_img_orig = $( dataForecast ).find( "img[src*='meteograms/Plotter.php']" ).attr("src").split('?');
+            var urlParamsImg = new URLSearchParams( path_img_orig[1] );
+            var pcmd = urlParamsImg.get("pcmd");
+            
+            var nwsThunder = pcmd.charAt(9) === '1';
+            var nwsSnow = pcmd.substring(10, 14) !== '0000';
+            
+            var finalThunder = userThunder !== null ? (userThunder === "1") : nwsThunder;
+            var finalSnow = userSnow !== null ? (userSnow === "1") : nwsSnow;
+            
+            pcmd = finalThunder ? showThunder(pcmd) : hideThunder(pcmd);
+            pcmd = finalSnow ? showSnow(pcmd) : hideSnow(pcmd);
+            urlParamsImg.set("pcmd", pcmd);
 
-                     $("#img1").attr( "src", URL_BASE + path_img_array[0] + "?" + urlParamsImg.toString() );
-                     urlParamsImg.set( "ahour", "48" );
-                     $("#img2").attr( "src", URL_BASE + path_img_array[0] + "?" + urlParamsImg.toString() );
-                     urlParamsImg.set( "ahour", "96" );
-                     $("#img3").attr( "src", URL_BASE + path_img_array[0] + "?" + urlParamsImg.toString() );
-                 });
-              }
-            });
+            $("#img1").attr( "src", URL_BASE + path_img_orig[0] + "?" + urlParamsImg.toString() );
+            urlParamsImg.set( "ahour", "48" );
+            $("#img2").attr( "src", URL_BASE + path_img_orig[0] + "?" + urlParamsImg.toString() );
+            urlParamsImg.set( "ahour", "96" );
+            $("#img3").attr( "src", URL_BASE + path_img_orig[0] + "?" + urlParamsImg.toString() );
+        });
+    }});
+  } else {
+    // Direct geolocation attempt as per original code
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            function(position) { redirect_to_zip_using_latlng( position.coords.latitude, position.coords.longitude ); },
+            function(error) { fallbackToIPLocation(); }
+        );
+    } else {
+        fallbackToIPLocation();
+    }
   }
 }
 </script>
