@@ -10,7 +10,7 @@
   .gps-btn { background: none; border: none; cursor: pointer; padding: 2px 4px; display: flex; align-items: center; }
   .checkbox-label { font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
   
-  /* Mobile: Horizontal scroll, images constrained to allow pinch-zoom */
+  /* Mobile: Horizontal scroll, images constrained to 80vh to allow pinch-zoom */
   @media (max-width: 767px) {
     .weather-images {
       display: flex;
@@ -54,16 +54,15 @@
 String.prototype.replaceAt = function(index, replacement) {
     return this.substr(0, index) + replacement + this.substr(index + replacement.length);
 }
-// Corrected indices based on your findings:
-// 5,6,7=Atmo, 8=Rain, 9=Thunder, 10-13=Snow
+// Bitmasks for NWS Plotter: 5-7=Atmo, 8=Rain, 9=Thunder, 10=Snow
 function hideAtmo(s)    { return s.replaceAt(5, "000"); }
 function showAtmo(s)    { return s.replaceAt(5, "111"); }
 function hideRain(s)    { return s.replaceAt(8, "0"); }
 function showRain(s)    { return s.replaceAt(8, "1"); }
 function hideThunder(s) { return s.replaceAt(9, "0"); }
 function showThunder(s) { return s.replaceAt(9, "1"); }
-function hideSnow(s)    { return s.replaceAt(10, "0000"); }
-function showSnow(s)    { return s.replaceAt(10, "1111"); }
+function hideSnow(s)    { return s.replaceAt(10, "0"); }
+function showSnow(s)    { return s.replaceAt(10, "1"); }
 
 let currentLat = null, currentLon = null;
 
@@ -204,7 +203,7 @@ window.onload = function () {
         const pcmd = params.get("pcmd");
         
         const finalThunder = urlParams.get("thunder") !== null ? (urlParams.get("thunder") === "1") : (pcmd.charAt(9) === '1');
-        const finalSnow = urlParams.get("snow") !== null ? (urlParams.get("snow") === "1") : (pcmd.substring(10, 14) !== '0000');
+        const finalSnow = urlParams.get("snow") !== null ? (urlParams.get("snow") === "1") : (pcmd.charAt(10) === '1');
         const finalRain = urlParams.get("rain") !== null ? (urlParams.get("rain") === "1") : (pcmd.charAt(8) === '1');
         const finalAtmo = urlParams.get("atmo") !== null ? (urlParams.get("atmo") === "1") : (pcmd.substring(5, 8) !== '000');
         
