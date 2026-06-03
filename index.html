@@ -159,12 +159,17 @@ window.onload = function () {
           .then(html => {
               const doc = new DOMParser().parseFromString(html, 'text/html');
               let parsedName = "Location";
-              // Hunt for the actual forecast point name, ignoring airport observation stations
               const headings = doc.querySelectorAll("h2, .panel-title");
               for (let i = 0; i < headings.length; i++) {
-                  let text = headings[i].textContent;
-                  if (text.includes("Extended Forecast for")) {
-                      parsedName = text.replace(/Extended Forecast for/i, "").replace(/\s+/g, " ").trim();
+                  let text = headings[i].textContent.trim();
+                  if (text.toLowerCase().includes("extended forecast for")) {
+                      let extracted = text.replace(/Extended Forecast for/ig, "").trim();
+                      if (extracted) {
+                          parsedName = extracted;
+                      } else if (i + 1 < headings.length) {
+                          // Cleanly split at <br> to avoid merging with NWS coordinate lines
+                          parsedName = headings[i+1].innerHTML.split(/<br\s*\/?>/i)[0].replace(/<[^>]+>/g, '').trim();
+                      }
                       break;
                   }
               }
@@ -235,12 +240,16 @@ window.onload = function () {
               preferredName = cityName + (state ? ", " + state : "");
           } else {
               const docZip = new DOMParser().parseFromString(text, 'text/html');
-              // Ensure we apply the same robust parsing rule to the ZIP fallback route
               const headings = docZip.querySelectorAll("h2, .panel-title");
               for (let i = 0; i < headings.length; i++) {
-                  let hdText = headings[i].textContent;
-                  if (hdText.includes("Extended Forecast for")) {
-                      preferredName = hdText.replace(/Extended Forecast for/i, "").replace(/\s+/g, " ").trim();
+                  let hdText = headings[i].textContent.trim();
+                  if (hdText.toLowerCase().includes("extended forecast for")) {
+                      let extracted = hdText.replace(/Extended Forecast for/ig, "").trim();
+                      if (extracted) {
+                          preferredName = extracted;
+                      } else if (i + 1 < headings.length) {
+                          preferredName = headings[i+1].innerHTML.split(/<br\s*\/?>/i)[0].replace(/<[^>]+>/g, '').trim();
+                      }
                       break;
                   }
               }
