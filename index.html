@@ -110,104 +110,21 @@ function manualGeolocate() {
 
 const URL_BASE = "https://forecast.weather.gov/";
 
-function parseNWSLocationName(html) {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    let parsedName = "Location";
-    
-    // Strategy 1: Look for "Extended Forecast for"
-    const elements = doc.querySelectorAll("h1, h2, h3, h4, .panel-title, b, strong");
-    for (let i = 0; i < elements.length; i++) {
-        let hdText = elements[i].textContent.trim();
-        if (hdText.toLowerCase().includes("extended forecast for")) {
-            let extracted = hdText.replace(/Extended Forecast for/ig, "").replace(/^[:\s]+/, "").trim();
-            if (extracted && extracted.length < 100) {
-                parsedName = extracted;
-                break;
-            }
-            
-            // Check next siblings for the location name
-            let next = elements[i].nextSibling;
-            let found = false;
-            while (next) {
-                let text = "";
-                if (next.nodeType === 3) {
-                    text = next.nodeValue.trim();
-                } else if (next.nodeType === 1) {
-                    // Extract only the first line before a <br> to prevent grabbing huge text blocks
-                    text = next.innerHTML.split(/<br\s*\/?>/i)[0].replace(/<[^>]+>/g, '').trim();
-                }
-                
-                if (text !== "" && text.length < 100 && next.nodeName !== "SCRIPT" && next.nodeName !== "STYLE") {
-                    parsedName = text;
-                    found = true;
-                    break;
-                }
-                next = next.nextSibling;
-            }
-            if (found) break;
-        }
-    }
-    
-    // Strategy 2: Fallback to "Point Forecast:"
-    if (parsedName === "Location" || !parsedName) {
-        for (let i = 0; i < elements.length; i++) {
-            let text = elements[i].textContent.trim();
-            if (text.toLowerCase().includes("point forecast")) {
-                let extracted = text.replace(/Point Forecast\s*[:]?\s*/ig, "").trim();
-                if (extracted && extracted.length < 100) {
-                    parsedName = extracted;
-                    break;
-                }
-                let next = elements[i].nextSibling;
-                let found = false;
-                while (next) {
-                    let nText = "";
-                    if (next.nodeType === 3) {
-                        nText = next.nodeValue.trim();
-                    } else if (next.nodeType === 1) {
-                        nText = next.innerHTML.split(/<br\s*\/?>/i)[0].replace(/<[^>]+>/g, '').trim();
-                    }
-                    nText = nText.replace(/^[:\s]+/, "").trim();
-                    
-                    if (nText !== "" && nText.length < 100 && next.nodeName !== "SCRIPT" && next.nodeName !== "STYLE") {
-                        parsedName = nText;
-                        found = true;
-                        break;
-                    }
-                    next = next.nextSibling;
-                }
-                if (found) break;
-            }
-        }
-    }
-    
-    // Clean up trailing coordinates if present
-    if (parsedName !== "Location") {
-        parsedName = parsedName.replace(/\d+\.\d+°[NS].*/i, "").trim();
-    }
-    
-    return parsedName || "Location";
-}
-
 window.onload = function () {
   const urlParams = new URLSearchParams(window.location.search);
   
-//  const chkThunder = document.getElementById("chkThunder");
   const chkSnow = document.getElementById("chkSnow");
   const chkRain = document.getElementById("chkRain");
   const chkAtmo = document.getElementById("chkAtmo");
 
-//  chkThunder.checked = (urlParams.get("thunder") === "1");
   chkAtmo.checked = (urlParams.get("atmo") === "1");
   
-  // Snow and Rain can default to their NWS state if user hasn't specified
   chkSnow.checked = (urlParams.has("snow") ? urlParams.get("snow") === "1" : true);
   chkRain.checked = (urlParams.has("rain") ? urlParams.get("rain") === "1" : true);
 
   [chkSnow, chkRain, chkAtmo].forEach(el => {
       el.addEventListener('change', (e) => {
           const key = e.target.id.replace('chk', '').toLowerCase();
-          
           var u = new URL(window.location.href); 
           u.searchParams.set(key, e.target.checked ? "1" : "0"); 
           window.location.href = u.href; 
@@ -231,17 +148,40 @@ window.onload = function () {
               `<a href="https://www.rainviewer.com/weather-radar-map-live.html?lat=${lat}&lon=${lon}&zoom=8" target="_blank">RainViewer</a>`;
       }
 
-      // Fetch standard NWS page (forcing desktop text view to block mobile redirects)
+      // If preferredName is missing (Lat/Lon Flow), reliably fetch the exact name via JSON endpoint
       let namePromise = preferredName ? Promise.resolve(preferredName) : 
-          fetch(`${URL_BASE}MapClick.php?lat=${lat}&lon=${lon}&FcstType=text`)
-          .then(r => r.text())
-          .then(html => parseNWSLocationName(html))
-          .catch(() => "Location");
+          fetch(`${URL_BASE}MapClick.php?lat=${lat}&lon=${lon}&FcstType=json`)
+          .then(r => r.json())
+          .then(data => {
+              if (data && data.location && data.location.areaDescription) {
+                  return data.location.areaDescription;
+              }
+              throw new Error("Missing JSON areaDescription");
+          })
+          .catch(() => {
+              // HTML Fallback just in case JSON endpoint is temporarily down
+              return fetch(`${URL_BASE}MapClick.php?lat=${lat}&lon=${lon}`)
+              .then(r => r.text())
+              .then(html => {
+                  const doc = new DOMParser().parseFromString(html, 'text/html');
+                  const headings = doc.querySelectorAll("h2, .panel-title, b");
+                  for (let i = 0; i < headings.length; i++) {
+                      let txt = headings[i].textContent.trim();
+                      if (txt.toLowerCase().includes("extended forecast for")) {
+                          let ext = txt.replace(/Extended Forecast for/ig, "").replace(/^[:\s]+/, "").trim();
+                          if (ext) return ext;
+                          let next = headings[i].nextSibling;
+                          if (next && next.nodeType === 3) return next.nodeValue.trim();
+                          if (next && next.nodeType === 1) return next.innerHTML.split(/<br/i)[0].replace(/<[^>]+>/g, '').trim();
+                      }
+                  }
+                  return "Location";
+              }).catch(() => "Location");
+          });
 
       let forecastPromise = fetch(`${URL_BASE}MapClick.php?lat=${lat}&lon=${lon}&unit=0&lg=english&FcstType=graphical`)
           .then(r => r.text());
 
-      // Wait for both the name and the graphical forecast to return
       Promise.all([namePromise, forecastPromise])
       .then(([locName, dataForecast]) => {
           if (!dataForecast) return;
@@ -261,14 +201,10 @@ window.onload = function () {
           let newPcmd = hideHeatIndex(pcmd);
           newPcmd = hideThunder(newPcmd);
           
-          // Logical check: Use URL params, fallback to pcmd bit check for Snow/Rain only
-          // Atmo remains forced by checkbox state (ignoring original bits)
-//        chkThunder.checked = (urlParams.has("thunder") ? urlParams.get("thunder") === "1" : false);
           chkAtmo.checked = (urlParams.has("atmo") ? urlParams.get("atmo") === "1" : false);
           chkSnow.checked = (urlParams.has("snow") ? urlParams.get("snow") === "1" : (pcmd.charAt(10) === '1'));
           chkRain.checked = (urlParams.has("rain") ? urlParams.get("rain") === "1" : (pcmd.charAt(8) === '1'));
           
-//        newPcmd = chkThunder.checked ? showThunder(newPcmd) : hideThunder(newPcmd);
           newPcmd = chkSnow.checked ? showSnow(newPcmd) : hideSnow(newPcmd);
           newPcmd = chkRain.checked ? showRain(newPcmd) : hideRain(newPcmd);
           newPcmd = chkAtmo.checked ? showAtmo(newPcmd) : hideAtmo(newPcmd);
@@ -290,27 +226,41 @@ window.onload = function () {
       fetch(URL_BASE + "zipcity.php", { method: 'POST', body: formData })
       .then(r => r.text().then(text => ({ text, url: r.url })))
       .then(({text, url}) => {
-          const urlParamsRedirected = new URLSearchParams(url.split("?")[1]);
-          currentLat = urlParamsRedirected.get("lat");
-          currentLon = urlParamsRedirected.get("lon");
+          const queryStr = url.includes("?") ? url.split("?")[1] : "";
+          const urlParamsRedirected = new URLSearchParams(queryStr);
+          
+          // NWS redirect fallback parameters just in case
+          currentLat = urlParamsRedirected.get("lat") || urlParamsRedirected.get("textField1");
+          currentLon = urlParamsRedirected.get("lon") || urlParamsRedirected.get("textField2");
 
-          let preferredName = null;
           let cityName = urlParamsRedirected.get("CityName") || "";
           let state = urlParamsRedirected.get("state") || "";
           
-          if (cityName) {
-              preferredName = cityName + (state ? ", " + state : "");
-          } else {
-              preferredName = parseNWSLocationName(text);
+          // Original robust HTML fallback logic for the Zip flow
+          if (!cityName && text) {
+              const docZip = new DOMParser().parseFromString(text, 'text/html');
+              const h2Text = docZip.querySelector("h2")?.textContent || "";
+              const parts = h2Text.replace(/\s+/g, ' ').trim().split(',');
+              cityName = parts[0] ? parts[0].trim() : "";
+              state = parts.length > 1 ? parts[1].trim() : "";
           }
 
-          if (preferredName && preferredName !== "Location") {
+          let preferredName = null;
+          if (cityName) {
+              preferredName = cityName + (state ? ", " + state : "");
+          }
+
+          if (preferredName) {
               preferredName += " (" + urlParams.get("zip") + ")";
           } else {
               preferredName = "Location (" + urlParams.get("zip") + ")";
           }
           
-          fetchNWSData(currentLat, currentLon, preferredName);
+          if (currentLat && currentLon) {
+              fetchNWSData(currentLat, currentLon, preferredName);
+          } else {
+              document.getElementById("citystatezip").textContent = "Location Error: Could not resolve coordinates.";
+          }
       });
   }
 }
