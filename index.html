@@ -65,39 +65,32 @@ function fallbackToIPLocation() {
     }).catch(err => console.error("IP Fallback failed."));
 }
 
-function redirect_to_zip_using_latlng(lat, lng) {
-  if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
-      setTimeout(() => redirect_to_zip_using_latlng(lat, lng), 100);
-      return;
-  }
-  new google.maps.Geocoder().geocode({ 'location': {lat, lng} }, function(results, status) {
-    if (status === "OK") {
-      let zipCode = results.flatMap(r => r.address_components).find(c => c.types.includes('postal_code'))?.long_name;
-      if (zipCode) {
-        var url = new URL(window.location.href);
-        url.search = ""; url.searchParams.set("zip", zipCode);
-        window.location.href = url.href;
-      } else { fallbackToIPLocation(); }
-    } else { fallbackToIPLocation(); }
-  });
+function redirect_using_latlng(lat, lng) {
+    var url = new URL(window.location.href);
+    url.search = "";
+    url.searchParams.set("lat", lat.toFixed(4));
+    url.searchParams.set("lon", lng.toFixed(4));
+    window.location.href = url.href;
 }
 
 function initAutocomplete() {
   const autocomplete = new google.maps.places.Autocomplete(document.getElementById('autocomplete'), {types: ['geocode']});
   autocomplete.addListener('place_changed', () => {
     const place = autocomplete.getPlace();
-    if (place.formatted_address) {
+    if (place.geometry && place.geometry.location) {
+        redirect_using_latlng(place.geometry.location.lat(), place.geometry.location.lng());
+    } else if (place.formatted_address) {
         new google.maps.Geocoder().geocode({ address: place.formatted_address, region: 'us' }, (results, status) => {
-            if (status === 'OK') redirect_to_zip_using_latlng(results[0].geometry.location.lat(), results[0].geometry.location.lng());
+            if (status === 'OK') redirect_using_latlng(results[0].geometry.location.lat(), results[0].geometry.location.lng());
         });
     }
   });
 
   const urlParams = new URLSearchParams(window.location.search);
-  if (!urlParams.has("zip")) {
+  if (!urlParams.has("zip") && (!urlParams.has("lat") || !urlParams.has("lon"))) {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (p) => redirect_to_zip_using_latlng(p.coords.latitude, p.coords.longitude),
+        (p) => redirect_using_latlng(p.coords.latitude, p.coords.longitude),
         () => fallbackToIPLocation(),
         { timeout: 5000 }
       );
@@ -108,7 +101,7 @@ function initAutocomplete() {
 function manualGeolocate() {
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
-        (p) => redirect_to_zip_using_latlng(p.coords.latitude, p.coords.longitude),
+        (p) => redirect_using_latlng(p.coords.latitude, p.coords.longitude),
         () => fallbackToIPLocation(),
         { timeout: 5000 }
     );
@@ -120,12 +113,10 @@ const URL_BASE = "https://forecast.weather.gov/";
 window.onload = function () {
   const urlParams = new URLSearchParams(window.location.search);
   
-//  const chkThunder = document.getElementById("chkThunder");
   const chkSnow = document.getElementById("chkSnow");
   const chkRain = document.getElementById("chkRain");
   const chkAtmo = document.getElementById("chkAtmo");
 
-//  chkThunder.checked = (urlParams.get("thunder") === "1");
   chkAtmo.checked = (urlParams.get("atmo") === "1");
   
   // Snow and Rain can default to their NWS state if user hasn't specified
@@ -145,73 +136,93 @@ window.onload = function () {
   document.getElementById("autocomplete").onkeydown = (e) => {
     if (e.keyCode === 13) { 
         new google.maps.Geocoder().geocode({ address: document.getElementById("autocomplete").value }, (results, status) => {
-            if (status === 'OK') redirect_to_zip_using_latlng(results[0].geometry.location.lat(), results[0].geometry.location.lng());
+            if (status === 'OK') redirect_using_latlng(results[0].geometry.location.lat(), results[0].geometry.location.lng());
         });
         return false; 
     }
   };
-  
-  if (urlParams.has("zip")) {
-    const formData = new FormData(); formData.append('inputstring', urlParams.get("zip"));
-    
-    fetch(URL_BASE + "zipcity.php", { method: 'POST', body: formData })
-    .then(r => r.text().then(text => ({ text, url: r.url })))
-    .then(({text, url}) => {
-        const urlParamsRedirected = new URLSearchParams(url.split("?")[1]);
-        currentLat = parseFloat(urlParamsRedirected.get("lat"));
-        currentLon = parseFloat(urlParamsRedirected.get("lon"));
 
-        if (currentLat && currentLon) {
-			document.getElementById("radarLinks").innerHTML =
-				`Radar: <a href="https://radar.weather.gov/?center=${currentLat},${currentLon}&zoom=8" target="_blank">NWS</a> | ` +
-				`<a href="https://www.windy.com/?radar,${currentLat},${currentLon},8" target="_blank">Windy</a> | ` +
-				`<a href="https://www.rainviewer.com/weather-radar-map-live.html?lat=${currentLat}&lon=${currentLon}&zoom=8" target="_blank">RainViewer</a>`;
-        }
-        
-        let cityName = urlParamsRedirected.get("CityName") || "";
-        let state = urlParamsRedirected.get("state") || "";
-        if (!cityName) {
-            const h2 = new DOMParser().parseFromString(text, 'text/html').querySelector("h2")?.textContent || "";
-            const parts = h2.replace(/\s+/g, ' ').trim().split(', ');
-            cityName = parts[0]; state = parts.length > 1 ? parts[1] : "";
-        }
-        document.getElementById("citystatezip").textContent = (cityName || "Location") + (state ? ", " + state : "") + " (" + urlParams.get("zip") + ") : ";
-        
-        return fetch(`${URL_BASE}MapClick.php?lat=${currentLat}&lon=${currentLon}&unit=0&lg=english&FcstType=graphical`);
-    })
-    .then(resp => resp?.text())
-    .then(dataForecast => {
-        if (!dataForecast) return;
-        const doc = new DOMParser().parseFromString(dataForecast, 'text/html');
-        const img = doc.querySelector("img[src*='meteograms/Plotter.php']");
-        if (!img) return;
-        
-        let imgSrc = img.getAttribute('src');
-        let fullImgUrl = imgSrc.startsWith('http') ? imgSrc : URL_BASE + imgSrc.replace(/^\//, '');
-        const [base, query] = fullImgUrl.split('?');
-        const params = new URLSearchParams(query);
-        const pcmd = params.get("pcmd");
-        
-        let newPcmd = hideHeatIndex(pcmd);
-        newPcmd = hideThunder(newPcmd);
-        
-        // Logical check: Use URL params, fallback to pcmd bit check for Snow/Rain only
-        // Atmo remains forced by checkbox state (ignoring original bits)
-//        chkThunder.checked = (urlParams.has("thunder") ? urlParams.get("thunder") === "1" : false);
-        chkAtmo.checked = (urlParams.has("atmo") ? urlParams.get("atmo") === "1" : false);
-        chkSnow.checked = (urlParams.has("snow") ? urlParams.get("snow") === "1" : (pcmd.charAt(10) === '1'));
-        chkRain.checked = (urlParams.has("rain") ? urlParams.get("rain") === "1" : (pcmd.charAt(8) === '1'));
-        
-//        newPcmd = chkThunder.checked ? showThunder(newPcmd) : hideThunder(newPcmd);
-        newPcmd = chkSnow.checked ? showSnow(newPcmd) : hideSnow(newPcmd);
-        newPcmd = chkRain.checked ? showRain(newPcmd) : hideRain(newPcmd);
-        newPcmd = chkAtmo.checked ? showAtmo(newPcmd) : hideAtmo(newPcmd);
-        params.set("pcmd", newPcmd);
+  function fetchNWSData(lat, lon, preferredName) {
+      if (lat && lon) {
+          document.getElementById("radarLinks").innerHTML =
+              `Radar: <a href="https://radar.weather.gov/?center=${lat},${lon}&zoom=8" target="_blank">NWS</a> | ` +
+              `<a href="https://www.windy.com/?radar,${lat},${lon},8" target="_blank">Windy</a> | ` +
+              `<a href="https://www.rainviewer.com/weather-radar-map-live.html?lat=${lat}&lon=${lon}&zoom=8" target="_blank">RainViewer</a>`;
+      }
 
-        document.getElementById("img1").src = base + "?" + params.toString();
-        params.set("ahour", "48"); document.getElementById("img2").src = base + "?" + params.toString();
-        params.set("ahour", "96"); document.getElementById("img3").src = base + "?" + params.toString();
-    });
+      fetch(`${URL_BASE}MapClick.php?lat=${lat}&lon=${lon}&unit=0&lg=english&FcstType=graphical`)
+      .then(resp => resp?.text())
+      .then(dataForecast => {
+          if (!dataForecast) return;
+          const doc = new DOMParser().parseFromString(dataForecast, 'text/html');
+          
+          const img = doc.querySelector("img[src*='meteograms/Plotter.php']");
+          if (!img) return;
+
+          let loc = preferredName;
+          if (!loc) {
+              loc = doc.querySelector("h2.panel-title")?.textContent.trim() || "Location";
+          }
+          document.getElementById("citystatezip").textContent = loc + " : ";
+          
+          let imgSrc = img.getAttribute('src');
+          let fullImgUrl = imgSrc.startsWith('http') ? imgSrc : URL_BASE + imgSrc.replace(/^\//, '');
+          const [base, query] = fullImgUrl.split('?');
+          const params = new URLSearchParams(query);
+          const pcmd = params.get("pcmd");
+          
+          let newPcmd = hideHeatIndex(pcmd);
+          newPcmd = hideThunder(newPcmd);
+          
+          // Logical check: Use URL params, fallback to pcmd bit check for Snow/Rain only
+          // Atmo remains forced by checkbox state (ignoring original bits)
+          chkAtmo.checked = (urlParams.has("atmo") ? urlParams.get("atmo") === "1" : false);
+          chkSnow.checked = (urlParams.has("snow") ? urlParams.get("snow") === "1" : (pcmd.charAt(10) === '1'));
+          chkRain.checked = (urlParams.has("rain") ? urlParams.get("rain") === "1" : (pcmd.charAt(8) === '1'));
+          
+          newPcmd = chkSnow.checked ? showSnow(newPcmd) : hideSnow(newPcmd);
+          newPcmd = chkRain.checked ? showRain(newPcmd) : hideRain(newPcmd);
+          newPcmd = chkAtmo.checked ? showAtmo(newPcmd) : hideAtmo(newPcmd);
+          params.set("pcmd", newPcmd);
+
+          document.getElementById("img1").src = base + "?" + params.toString();
+          params.set("ahour", "48"); document.getElementById("img2").src = base + "?" + params.toString();
+          params.set("ahour", "96"); document.getElementById("img3").src = base + "?" + params.toString();
+      });
+  }
+
+  if (urlParams.has("lat") && urlParams.has("lon")) {
+      currentLat = urlParams.get("lat");
+      currentLon = urlParams.get("lon");
+      fetchNWSData(currentLat, currentLon, null);
+  } else if (urlParams.has("zip")) {
+      const formData = new FormData(); formData.append('inputstring', urlParams.get("zip"));
+      
+      fetch(URL_BASE + "zipcity.php", { method: 'POST', body: formData })
+      .then(r => r.text().then(text => ({ text, url: r.url })))
+      .then(({text, url}) => {
+          const urlParamsRedirected = new URLSearchParams(url.split("?")[1]);
+          currentLat = urlParamsRedirected.get("lat");
+          currentLon = urlParamsRedirected.get("lon");
+
+          let preferredName = null;
+          let cityName = urlParamsRedirected.get("CityName") || "";
+          let state = urlParamsRedirected.get("state") || "";
+          
+          if (cityName) {
+              preferredName = cityName + (state ? ", " + state : "");
+          } else {
+              const h2 = new DOMParser().parseFromString(text, 'text/html').querySelector("h2")?.textContent || "";
+              const parts = h2.replace(/\s+/g, ' ').trim().split(', ');
+              if (parts[0]) preferredName = parts[0] + (parts.length > 1 ? ", " + parts[1] : "");
+          }
+
+          if (preferredName) {
+              preferredName += " (" + urlParams.get("zip") + ")";
+          }
+          
+          fetchNWSData(currentLat, currentLon, preferredName);
+      });
   }
 }
 </script>
@@ -229,8 +240,7 @@ window.onload = function () {
         <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
       </svg>
     </button>
-<!--    <label class="checkbox-label"><input type="checkbox" id="chkThunder"> Thunder</label> -->
-    <label class="checkbox-label"><input type="checkbox" id="chkSnow"> Snow</label>
+<label class="checkbox-label"><input type="checkbox" id="chkSnow"> Snow</label>
     <label class="checkbox-label"><input type="checkbox" id="chkRain"> Rain</label>
     <label class="checkbox-label"><input type="checkbox" id="chkAtmo"> Atmosphere</label>
   </div>
