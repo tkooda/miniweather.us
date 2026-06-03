@@ -158,8 +158,16 @@ window.onload = function () {
           .then(r => r.text())
           .then(html => {
               const doc = new DOMParser().parseFromString(html, 'text/html');
-              let h2Text = doc.querySelector("h2")?.textContent || "";
-              let parsedName = h2Text.replace(/\s+/g, ' ').trim();
+              let parsedName = "Location";
+              // Hunt for the actual forecast point name, ignoring airport observation stations
+              const headings = doc.querySelectorAll("h2, .panel-title");
+              for (let i = 0; i < headings.length; i++) {
+                  let text = headings[i].textContent;
+                  if (text.includes("Extended Forecast for")) {
+                      parsedName = text.replace(/Extended Forecast for/i, "").replace(/\s+/g, " ").trim();
+                      break;
+                  }
+              }
               return parsedName || "Location";
           }).catch(() => "Location");
 
@@ -226,12 +234,19 @@ window.onload = function () {
           if (cityName) {
               preferredName = cityName + (state ? ", " + state : "");
           } else {
-              const h2 = new DOMParser().parseFromString(text, 'text/html').querySelector("h2")?.textContent || "";
-              const parts = h2.replace(/\s+/g, ' ').trim().split(', ');
-              if (parts[0]) preferredName = parts[0] + (parts.length > 1 ? ", " + parts[1] : "");
+              const docZip = new DOMParser().parseFromString(text, 'text/html');
+              // Ensure we apply the same robust parsing rule to the ZIP fallback route
+              const headings = docZip.querySelectorAll("h2, .panel-title");
+              for (let i = 0; i < headings.length; i++) {
+                  let hdText = headings[i].textContent;
+                  if (hdText.includes("Extended Forecast for")) {
+                      preferredName = hdText.replace(/Extended Forecast for/i, "").replace(/\s+/g, " ").trim();
+                      break;
+                  }
+              }
           }
 
-          if (preferredName) {
+          if (preferredName && preferredName !== "Location") {
               preferredName += " (" + urlParams.get("zip") + ")";
           }
           
