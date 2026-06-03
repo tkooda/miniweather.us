@@ -110,6 +110,51 @@ function manualGeolocate() {
 
 const URL_BASE = "https://forecast.weather.gov/";
 
+function parseNWSLocationName(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    let parsedName = "Location";
+    
+    // Strategy 1: Look for "Extended Forecast for"
+    const headings = doc.querySelectorAll("h1, h2, h3, .panel-title");
+    for (let i = 0; i < headings.length; i++) {
+        let hdText = headings[i].textContent.trim();
+        if (hdText.toLowerCase().includes("extended forecast for")) {
+            let extracted = hdText.replace(/Extended Forecast for/ig, "").trim();
+            if (extracted) {
+                parsedName = extracted;
+            } else if (i + 1 < headings.length) {
+                // Safely grab the next heading line, splitting at <br> to avoid coordinate text
+                parsedName = headings[i+1].innerHTML.split(/<br\s*\/?>/i)[0].replace(/<[^>]+>/g, '').trim();
+            }
+            break;
+        }
+    }
+    
+    // Strategy 2: Fallback to the NWS "Point Forecast:" footer
+    if (parsedName === "Location" || !parsedName) {
+        const bTags = doc.querySelectorAll("b, strong");
+        for (let i = 0; i < bTags.length; i++) {
+            let b = bTags[i];
+            if (b.textContent.includes("Point Forecast")) {
+                let text = b.textContent.replace(/Point Forecast\s*[:]?\s*/i, "").trim();
+                if (text) {
+                    parsedName = text;
+                    break;
+                }
+                let nextNode = b.nextSibling;
+                if (nextNode && nextNode.nodeType === 3) {
+                    let textNodeStr = nextNode.nodeValue.replace(/^[:\s]+/, "").trim();
+                    if (textNodeStr) {
+                        parsedName = textNodeStr;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    return parsedName || "Location";
+}
+
 window.onload = function () {
   const urlParams = new URLSearchParams(window.location.search);
   
@@ -152,29 +197,12 @@ window.onload = function () {
               `<a href="https://www.rainviewer.com/weather-radar-map-live.html?lat=${lat}&lon=${lon}&zoom=8" target="_blank">RainViewer</a>`;
       }
 
-      // Fetch standard NWS page to extract the location name if none was provided
+      // Fetch standard NWS page (forcing desktop text view to block mobile redirects)
       let namePromise = preferredName ? Promise.resolve(preferredName) : 
-          fetch(`${URL_BASE}MapClick.php?lat=${lat}&lon=${lon}`)
+          fetch(`${URL_BASE}MapClick.php?lat=${lat}&lon=${lon}&FcstType=text`)
           .then(r => r.text())
-          .then(html => {
-              const doc = new DOMParser().parseFromString(html, 'text/html');
-              let parsedName = "Location";
-              const headings = doc.querySelectorAll("h2, .panel-title");
-              for (let i = 0; i < headings.length; i++) {
-                  let text = headings[i].textContent.trim();
-                  if (text.toLowerCase().includes("extended forecast for")) {
-                      let extracted = text.replace(/Extended Forecast for/ig, "").trim();
-                      if (extracted) {
-                          parsedName = extracted;
-                      } else if (i + 1 < headings.length) {
-                          // Cleanly split at <br> to avoid merging with NWS coordinate lines
-                          parsedName = headings[i+1].innerHTML.split(/<br\s*\/?>/i)[0].replace(/<[^>]+>/g, '').trim();
-                      }
-                      break;
-                  }
-              }
-              return parsedName || "Location";
-          }).catch(() => "Location");
+          .then(html => parseNWSLocationName(html))
+          .catch(() => "Location");
 
       let forecastPromise = fetch(`${URL_BASE}MapClick.php?lat=${lat}&lon=${lon}&unit=0&lg=english&FcstType=graphical`)
           .then(r => r.text());
@@ -239,24 +267,13 @@ window.onload = function () {
           if (cityName) {
               preferredName = cityName + (state ? ", " + state : "");
           } else {
-              const docZip = new DOMParser().parseFromString(text, 'text/html');
-              const headings = docZip.querySelectorAll("h2, .panel-title");
-              for (let i = 0; i < headings.length; i++) {
-                  let hdText = headings[i].textContent.trim();
-                  if (hdText.toLowerCase().includes("extended forecast for")) {
-                      let extracted = hdText.replace(/Extended Forecast for/ig, "").trim();
-                      if (extracted) {
-                          preferredName = extracted;
-                      } else if (i + 1 < headings.length) {
-                          preferredName = headings[i+1].innerHTML.split(/<br\s*\/?>/i)[0].replace(/<[^>]+>/g, '').trim();
-                      }
-                      break;
-                  }
-              }
+              preferredName = parseNWSLocationName(text);
           }
 
           if (preferredName && preferredName !== "Location") {
               preferredName += " (" + urlParams.get("zip") + ")";
+          } else {
+              preferredName = "Location (" + urlParams.get("zip") + ")";
           }
           
           fetchNWSData(currentLat, currentLon, preferredName);
