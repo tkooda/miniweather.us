@@ -113,10 +113,12 @@ const URL_BASE = "https://forecast.weather.gov/";
 window.onload = function () {
   const urlParams = new URLSearchParams(window.location.search);
   
+//  const chkThunder = document.getElementById("chkThunder");
   const chkSnow = document.getElementById("chkSnow");
   const chkRain = document.getElementById("chkRain");
   const chkAtmo = document.getElementById("chkAtmo");
 
+//  chkThunder.checked = (urlParams.get("thunder") === "1");
   chkAtmo.checked = (urlParams.get("atmo") === "1");
   
   // Snow and Rain can default to their NWS state if user hasn't specified
@@ -150,20 +152,30 @@ window.onload = function () {
               `<a href="https://www.rainviewer.com/weather-radar-map-live.html?lat=${lat}&lon=${lon}&zoom=8" target="_blank">RainViewer</a>`;
       }
 
-      fetch(`${URL_BASE}MapClick.php?lat=${lat}&lon=${lon}&unit=0&lg=english&FcstType=graphical`)
-      .then(resp => resp?.text())
-      .then(dataForecast => {
+      // Fetch standard NWS page to extract the location name if none was provided
+      let namePromise = preferredName ? Promise.resolve(preferredName) : 
+          fetch(`${URL_BASE}MapClick.php?lat=${lat}&lon=${lon}`)
+          .then(r => r.text())
+          .then(html => {
+              const doc = new DOMParser().parseFromString(html, 'text/html');
+              let h2Text = doc.querySelector("h2")?.textContent || "";
+              let parsedName = h2Text.replace(/\s+/g, ' ').trim();
+              return parsedName || "Location";
+          }).catch(() => "Location");
+
+      let forecastPromise = fetch(`${URL_BASE}MapClick.php?lat=${lat}&lon=${lon}&unit=0&lg=english&FcstType=graphical`)
+          .then(r => r.text());
+
+      // Wait for both the name and the graphical forecast to return
+      Promise.all([namePromise, forecastPromise])
+      .then(([locName, dataForecast]) => {
           if (!dataForecast) return;
           const doc = new DOMParser().parseFromString(dataForecast, 'text/html');
           
           const img = doc.querySelector("img[src*='meteograms/Plotter.php']");
           if (!img) return;
 
-          let loc = preferredName;
-          if (!loc) {
-              loc = doc.querySelector("h2.panel-title")?.textContent.trim() || "Location";
-          }
-          document.getElementById("citystatezip").textContent = loc + " : ";
+          document.getElementById("citystatezip").textContent = locName + " : ";
           
           let imgSrc = img.getAttribute('src');
           let fullImgUrl = imgSrc.startsWith('http') ? imgSrc : URL_BASE + imgSrc.replace(/^\//, '');
@@ -176,10 +188,12 @@ window.onload = function () {
           
           // Logical check: Use URL params, fallback to pcmd bit check for Snow/Rain only
           // Atmo remains forced by checkbox state (ignoring original bits)
+//        chkThunder.checked = (urlParams.has("thunder") ? urlParams.get("thunder") === "1" : false);
           chkAtmo.checked = (urlParams.has("atmo") ? urlParams.get("atmo") === "1" : false);
           chkSnow.checked = (urlParams.has("snow") ? urlParams.get("snow") === "1" : (pcmd.charAt(10) === '1'));
           chkRain.checked = (urlParams.has("rain") ? urlParams.get("rain") === "1" : (pcmd.charAt(8) === '1'));
           
+//        newPcmd = chkThunder.checked ? showThunder(newPcmd) : hideThunder(newPcmd);
           newPcmd = chkSnow.checked ? showSnow(newPcmd) : hideSnow(newPcmd);
           newPcmd = chkRain.checked ? showRain(newPcmd) : hideRain(newPcmd);
           newPcmd = chkAtmo.checked ? showAtmo(newPcmd) : hideAtmo(newPcmd);
